@@ -3,6 +3,7 @@ import { action } from "@void/react";
 import {
   Check,
   Code2,
+  Eye,
   History,
   PanelRightClose,
   PanelRightOpen,
@@ -12,6 +13,11 @@ import {
 import { getByPath, type DataModel } from "@/a2ui/data-model";
 import { A2UISurface } from "@/a2ui/renderer";
 import { a2uiMessagesSchema, type A2UIAction, type A2UIMessage } from "@/a2ui/types";
+import {
+  A2UIChatPanel,
+  type AiPreviewDraft,
+  type CompareMode,
+} from "@/components/ai/a2ui-chat-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,11 +58,16 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
 
   // Right sidebar state (open by default)
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [panelTab, setPanelTab] = useState<"history" | "editor">("history");
+  const [panelTab, setPanelTab] = useState<"ai" | "history" | "editor">("ai");
   const [editorJson, setEditorJson] = useState(activeVersion?.messagesJson ?? "[]");
   const [versionName, setVersionName] = useState(`v${uiVersions.length + 1}: カスタム定義`);
   const [versionDesc, setVersionDesc] = useState("");
   const [editorError, setEditorError] = useState<string | null>(null);
+
+  // Live preview & comparison state for AI-generated A2UI
+  const [previewDraft, setPreviewDraft] = useState<AiPreviewDraft | null>(null);
+  const [compareMode, setCompareMode] = useState<CompareMode>("preview");
+  const [appliedMessageIds, setAppliedMessageIds] = useState<Record<string, boolean>>({});
 
   const messages = useMemo(
     () => parseMessages(activeVersion?.messagesJson ?? "[]"),
@@ -166,6 +177,7 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
       if (next) {
         setEditorJson(next.messagesJson);
       }
+      setPreviewDraft(null);
     } finally {
       setPending(false);
     }
@@ -204,15 +216,72 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
     }
   };
 
+  const handlePreviewAiVersion = (draft: AiPreviewDraft) => {
+    setPreviewDraft(draft);
+    setCompareMode((prev) => (prev === "current" ? "preview" : prev));
+  };
+
+  const handleApplyAiVersion = async (options: {
+    messageId: string;
+    name: string;
+    description: string;
+    messagesJson: string;
+  }): Promise<void> => {
+    setFeedback(null);
+    setPending(true);
+    try {
+      const res = await action("/?saveVersion", {
+        data: {
+          name: options.name,
+          description: options.description,
+          messagesJson: options.messagesJson,
+        },
+      });
+      if (!res.ok) {
+        setFeedback({ type: "error", message: res.error.message });
+        return;
+      }
+      setEditorJson(options.messagesJson);
+      setAppliedMessageIds((prev) => ({ ...prev, [options.messageId]: true }));
+      setPreviewDraft(null);
+      setCompareMode("preview");
+      setFeedback({
+        type: "success",
+        message: `「${options.name}」を適用しました。`,
+      });
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const handleOpenAiJsonInEditor = (messagesJson: string, suggestedName?: string) => {
+    setEditorJson(messagesJson);
+    setVersionName(suggestedName || `v${uiVersions.length + 1}: AI生成`);
+    setVersionDesc("");
+    setEditorError(null);
+    setPanelTab("editor");
+  };
+
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col lg:flex-row">
       {/* Main A2UI Dashboard Area */}
       <div className="min-w-0 flex-1">
-        <div className="mx-auto max-w-6xl space-y-4 px-4 py-6 sm:px-6">
+        <div
+          className={cn(
+            "mx-auto space-y-4 px-4 py-6 sm:px-6",
+            previewDraft && compareMode === "split" ? "max-w-7xl" : "max-w-6xl",
+          )}
+        >
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
               <h1 className="truncate text-xl font-bold tracking-tight">ダッシュボード</h1>
               {activeVersion && <Badge variant="outline">v{activeVersion.version}</Badge>}
+              {previewDraft && (
+                <Badge variant="default" className="gap-1">
+                  <Eye className="size-3" />
+                  プレビュー中
+                </Badge>
+              )}
             </div>
 
             {!sidebarOpen && (
@@ -241,13 +310,63 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
             </div>
           )}
 
-          <A2UISurface
-            messages={messages}
-            dataModel={dataModel}
-            onDataModelChange={handleDataModelChange}
-            onAction={handleAction}
-            pending={pending}
-          />
+          {previewDraft && compareMode === "split" ? (
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+              <div className="space-y-2.5 rounded-xl border p-4">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <span className="text-muted-foreground text-xs font-semibold">
+                    現在のUI（{activeVersion?.name ?? "現在"}）
+                  </span>
+                  <Badge variant="outline" className="text-[10px]">
+                    Before
+                  </Badge>
+                </div>
+                <A2UISurface
+                  messages={messages}
+                  dataModel={dataModel}
+                  onDataModelChange={handleDataModelChange}
+                  onAction={handleAction}
+                  pending={pending}
+                />
+              </div>
+
+              <div className="border-primary/40 ring-primary/15 space-y-2.5 rounded-xl border p-4 ring-2">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <span className="text-primary text-xs font-semibold">
+                    新しいUI（{previewDraft.name}）
+                  </span>
+                  <Badge variant="default" className="text-[10px]">
+                    After
+                  </Badge>
+                </div>
+                <A2UISurface
+                  messages={previewDraft.messages}
+                  dataModel={dataModel}
+                  onDataModelChange={handleDataModelChange}
+                  onAction={handleAction}
+                  pending={pending}
+                />
+              </div>
+            </div>
+          ) : previewDraft && compareMode === "preview" ? (
+            <div className="border-primary/35 ring-primary/10 rounded-xl border p-4 ring-2">
+              <A2UISurface
+                messages={previewDraft.messages}
+                dataModel={dataModel}
+                onDataModelChange={handleDataModelChange}
+                onAction={handleAction}
+                pending={pending}
+              />
+            </div>
+          ) : (
+            <A2UISurface
+              messages={messages}
+              dataModel={dataModel}
+              onDataModelChange={handleDataModelChange}
+              onAction={handleAction}
+              pending={pending}
+            />
+          )}
         </div>
       </div>
 
@@ -274,143 +393,181 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
 
           {/* Sidebar Tabs */}
           <div className="shrink-0 px-4 pt-3 pb-1">
-            <div className="bg-muted grid grid-cols-2 rounded-lg p-1">
+            <div className="bg-muted grid grid-cols-3 rounded-lg p-1">
+              <button
+                type="button"
+                onClick={() => setPanelTab("ai")}
+                className={cn(
+                  "inline-flex cursor-pointer items-center justify-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
+                  panelTab === "ai"
+                    ? "bg-background text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Sparkles className="size-3.5" />
+                AI調整
+              </button>
               <button
                 type="button"
                 onClick={() => setPanelTab("history")}
                 className={cn(
-                  "inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  "inline-flex cursor-pointer items-center justify-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
                   panelTab === "history"
                     ? "bg-background text-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 <History className="size-3.5" />
-                UI履歴 ({uiVersions.length})
+                履歴 ({uiVersions.length})
               </button>
               <button
                 type="button"
                 onClick={handleSwitchToEditor}
                 className={cn(
-                  "inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  "inline-flex cursor-pointer items-center justify-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
                   panelTab === "editor"
                     ? "bg-background text-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 <Code2 className="size-3.5" />
-                JSON編集
+                JSON
               </button>
             </div>
           </div>
 
-          {/* Sidebar Scrollable Body */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {panelTab === "history" ? (
-              <div className="space-y-3">
-                <p className="text-muted-foreground text-xs">
-                  同じ支出データのまま、保存済みの A2UI バージョンを切り替えられます。
-                </p>
+          {/* Sidebar Body */}
+          {panelTab === "ai" ? (
+            <div className="min-h-0 flex-1">
+              <A2UIChatPanel
+                activeVersionName={
+                  previewDraft
+                    ? `${previewDraft.name} (プレビュー中)`
+                    : (activeVersion?.name ?? "v1")
+                }
+                currentMessagesJson={
+                  previewDraft?.messagesJson ?? activeVersion?.messagesJson ?? "[]"
+                }
+                nextVersionNumber={uiVersions.length + 1}
+                saving={pending}
+                previewDraft={previewDraft}
+                compareMode={compareMode}
+                appliedMessageIds={appliedMessageIds}
+                onPreviewA2UI={handlePreviewAiVersion}
+                onChangeCompareMode={setCompareMode}
+                onDiscardPreview={() => setPreviewDraft(null)}
+                onApplyA2UI={handleApplyAiVersion}
+                onOpenInEditor={handleOpenAiJsonInEditor}
+              />
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto p-4">
+              {panelTab === "history" ? (
+                <div className="space-y-3">
+                  <p className="text-muted-foreground text-xs">
+                    同じ支出データのまま、保存済みの A2UI バージョンを切り替えられます。
+                  </p>
 
-                <div className="space-y-2">
-                  {uiVersions.map((ver) => {
-                    const isCurrent = ver.id === activeVersion?.id;
-                    return (
-                      <button
-                        key={ver.id}
-                        type="button"
-                        disabled={pending}
-                        onClick={() => handleActivateVersion(ver.id)}
-                        className={cn(
-                          "w-full cursor-pointer rounded-lg border p-3 text-left transition-colors disabled:opacity-50",
-                          isCurrent
-                            ? "border-primary bg-primary/5"
-                            : "bg-background hover:bg-accent/60",
-                        )}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="truncate text-sm font-medium">{ver.name}</span>
-                          {isCurrent ? (
-                            <Badge variant="default" className="gap-1">
-                              <Check className="size-3" />
-                              使用中
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline">v{ver.version}</Badge>
+                  <div className="space-y-2">
+                    {uiVersions.map((ver) => {
+                      const isCurrent = ver.id === activeVersion?.id;
+                      return (
+                        <button
+                          key={ver.id}
+                          type="button"
+                          disabled={pending}
+                          onClick={() => handleActivateVersion(ver.id)}
+                          className={cn(
+                            "w-full cursor-pointer rounded-lg border p-3 text-left transition-colors disabled:opacity-50",
+                            isCurrent
+                              ? "border-primary bg-primary/5"
+                              : "bg-background hover:bg-accent/60",
                           )}
-                        </div>
-                        {ver.description && (
-                          <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-                            {ver.description}
-                          </p>
-                        )}
-                      </button>
-                    );
-                  })}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate text-sm font-medium">{ver.name}</span>
+                            {isCurrent ? (
+                              <Badge variant="default" className="gap-1">
+                                <Check className="size-3" />
+                                使用中
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline">v{ver.version}</Badge>
+                            )}
+                          </div>
+                          {ver.description && (
+                            <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                              {ver.description}
+                            </p>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <Separator />
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={handleSwitchToEditor}
+                  >
+                    <Code2 className="size-4" />
+                    現在の JSON をベースに新規作成
+                  </Button>
                 </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-muted-foreground text-xs">
+                    A2UI メッセージ配列を編集して新しいバージョンとして保存します。
+                  </p>
 
-                <Separator />
+                  <div className="space-y-1.5">
+                    <Label htmlFor="version-name" className="text-xs">
+                      新しいバージョン名
+                    </Label>
+                    <Input
+                      id="version-name"
+                      value={versionName}
+                      onChange={(e) => setVersionName(e.target.value)}
+                      placeholder="例: v4: 2カラム改善版"
+                    />
+                  </div>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onClick={handleSwitchToEditor}
-                >
-                  <Code2 className="size-4" />
-                  現在の JSON をベースに新規作成
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-muted-foreground text-xs">
-                  A2UI メッセージ配列を編集して新しいバージョンとして保存します。
-                </p>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="version-desc" className="text-xs">
+                      変更メモ
+                    </Label>
+                    <Input
+                      id="version-desc"
+                      value={versionDesc}
+                      onChange={(e) => setVersionDesc(e.target.value)}
+                      placeholder="どこを改善したか"
+                    />
+                  </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="version-name" className="text-xs">
-                    新しいバージョン名
-                  </Label>
-                  <Input
-                    id="version-name"
-                    value={versionName}
-                    onChange={(e) => setVersionName(e.target.value)}
-                    placeholder="例: v4: 2カラム改善版"
-                  />
+                  <div className="space-y-1.5">
+                    <Label htmlFor="a2ui-json" className="text-xs">
+                      A2UI Messages JSON
+                    </Label>
+                    <Textarea
+                      id="a2ui-json"
+                      value={editorJson}
+                      onChange={(e) => setEditorJson(e.target.value)}
+                      rows={18}
+                      className="font-mono text-xs leading-relaxed"
+                    />
+                  </div>
+
+                  {editorError && (
+                    <p className="text-destructive text-xs font-medium">{editorError}</p>
+                  )}
                 </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="version-desc" className="text-xs">
-                    変更メモ
-                  </Label>
-                  <Input
-                    id="version-desc"
-                    value={versionDesc}
-                    onChange={(e) => setVersionDesc(e.target.value)}
-                    placeholder="どこを改善したか"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="a2ui-json" className="text-xs">
-                    A2UI Messages JSON
-                  </Label>
-                  <Textarea
-                    id="a2ui-json"
-                    value={editorJson}
-                    onChange={(e) => setEditorJson(e.target.value)}
-                    rows={18}
-                    className="font-mono text-xs leading-relaxed"
-                  />
-                </div>
-
-                {editorError && (
-                  <p className="text-destructive text-xs font-medium">{editorError}</p>
-                )}
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           {/* Sidebar Footer for Editor */}
           {panelTab === "editor" && (
