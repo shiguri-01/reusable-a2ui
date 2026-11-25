@@ -5,9 +5,9 @@ import "./style.css";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-muted/30 min-h-screen">
+    <div className="bg-muted/30 flex min-h-screen flex-col">
       <header className="bg-background/95 supports-backdrop-filter:bg-background/80 sticky top-0 z-30 border-b backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
+        <div className="flex h-14 items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
               <span className="bg-primary text-primary-foreground flex size-7 items-center justify-center rounded-md">
@@ -39,7 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">{children}</main>
+      <main className="flex-1">{children}</main>
     </div>
   );
 }
