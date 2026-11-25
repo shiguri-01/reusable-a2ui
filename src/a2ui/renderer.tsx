@@ -5,6 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { formatYen, type CategoryStat, type ExpenseItem } from "@/lib/expenses";
 import { cn } from "@/lib/utils";
@@ -338,7 +345,7 @@ export function A2UISurface({
                 min={node.min ?? 0}
                 value={value}
                 placeholder={node.placeholder}
-                className={cn(node.suffix && "pr-8")}
+                className={cn("text-right tabular-nums", node.suffix && "pr-8")}
                 onChange={(e) => updatePath(node.bindPath, e.target.value)}
               />
               {node.suffix && (
@@ -371,18 +378,18 @@ export function A2UISurface({
         return (
           <div key={node.id} className="flex flex-1 flex-col gap-1.5">
             <Label htmlFor={`a2ui-${node.id}`}>{node.label}</Label>
-            <select
-              id={`a2ui-${node.id}`}
-              value={value}
-              onChange={(e) => updatePath(node.bindPath, e.target.value)}
-              className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
-            >
-              {node.options.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
+            <Select value={value} onValueChange={(next) => updatePath(node.bindPath, next)}>
+              <SelectTrigger id={`a2ui-${node.id}`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {node.options.map((opt) => (
+                  <SelectItem key={opt} value={opt}>
+                    {opt}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         );
       }
@@ -417,21 +424,18 @@ export function A2UISurface({
 
         if (visible.length === 0) {
           return (
-            <div
-              key={node.id}
-              className="text-muted-foreground rounded-lg border border-dashed py-8 text-center text-sm"
-            >
+            <div key={node.id} className="text-muted-foreground py-8 text-center text-sm">
               {node.emptyText ?? "該当する支出ログがありません"}
             </div>
           );
         }
 
         return (
-          <div key={node.id} className="divide-y rounded-lg border">
+          <div key={node.id} className="divide-y">
             {visible.map((item) => (
               <div
                 key={item.id}
-                className="flex items-center justify-between gap-3 px-4 py-3 text-sm"
+                className="flex items-center justify-between gap-3 py-3 text-sm first:pt-0 last:pb-0"
               >
                 <div className="min-w-0 flex-1 space-y-0.5">
                   <div className="flex flex-wrap items-center gap-2">
@@ -439,9 +443,9 @@ export function A2UISurface({
                     {node.showCategory && <Badge variant="secondary">{item.category}</Badge>}
                   </div>
                   {(node.showDate || (node.showNote && item.note)) && (
-                    <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
+                    <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
                       {node.showDate && <span>{item.spentAt}</span>}
-                      {node.showNote && item.note && <span>· {item.note}</span>}
+                      {node.showNote && item.note && <span>{item.note}</span>}
                     </div>
                   )}
                 </div>

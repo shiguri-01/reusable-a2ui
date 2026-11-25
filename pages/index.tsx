@@ -1,15 +1,6 @@
 import { useMemo, useState } from "react";
 import { action } from "@void/react";
-import {
-  Check,
-  Code2,
-  Eye,
-  History,
-  PanelRightClose,
-  PanelRightOpen,
-  Plus,
-  Sparkles,
-} from "lucide-react";
+import { Check, Code2, Eye, History, Plus, Sparkles, X } from "lucide-react";
 import { getByPath, type DataModel } from "@/a2ui/data-model";
 import { A2UISurface } from "@/a2ui/renderer";
 import { a2uiMessagesSchema, type A2UIAction, type A2UIMessage } from "@/a2ui/types";
@@ -22,7 +13,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarInset,
+  SidebarRail,
+  useSidebar,
+} from "@/components/ui/sidebar";
 import { Textarea } from "@/components/ui/textarea";
 import { buildExpenseDataModel, EXPENSE_CATEGORIES, getTodayIso } from "@/lib/expenses";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,23 @@ function parseMessages(json: string): A2UIMessage[] {
   } catch {
     return [];
   }
+}
+
+function MobileSidebarCloseButton() {
+  const { setOpenMobile } = useSidebar();
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="size-8 md:hidden"
+      aria-label="サイドバーを閉じる"
+      onClick={() => setOpenMobile(false)}
+    >
+      <X className="size-4" />
+    </Button>
+  );
 }
 
 export default function DashboardPage({ expenses, uiVersions, activeVersionId }: Props) {
@@ -56,11 +74,10 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
     null,
   );
 
-  // Right sidebar state (open by default)
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Right sidebar tab & editor state
   const [panelTab, setPanelTab] = useState<"ai" | "history" | "editor">("ai");
   const [editorJson, setEditorJson] = useState(activeVersion?.messagesJson ?? "[]");
-  const [versionName, setVersionName] = useState(`v${uiVersions.length + 1}: カスタム定義`);
+  const [versionName, setVersionName] = useState(`v${uiVersions.length + 1}：カスタム定義`);
   const [versionDesc, setVersionDesc] = useState("");
   const [editorError, setEditorError] = useState<string | null>(null);
 
@@ -187,7 +204,7 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
     if (activeVersion) {
       setEditorJson(activeVersion.messagesJson);
     }
-    setVersionName(`v${uiVersions.length + 1}: カスタム定義`);
+    setVersionName(`v${uiVersions.length + 1}：カスタム定義`);
     setVersionDesc("");
     setEditorError(null);
     setPanelTab("editor");
@@ -195,7 +212,7 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
 
   const handleSaveNewVersion = async () => {
     setEditorError(null);
-    const name = versionName.trim() || `v${uiVersions.length + 1}: カスタム定義`;
+    const name = versionName.trim() || `v${uiVersions.length + 1}：カスタム定義`;
     setPending(true);
     try {
       const res = await action("/?saveVersion", {
@@ -256,19 +273,19 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
 
   const handleOpenAiJsonInEditor = (messagesJson: string, suggestedName?: string) => {
     setEditorJson(messagesJson);
-    setVersionName(suggestedName || `v${uiVersions.length + 1}: AI生成`);
+    setVersionName(suggestedName || `v${uiVersions.length + 1}：AI生成`);
     setVersionDesc("");
     setEditorError(null);
     setPanelTab("editor");
   };
 
   return (
-    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col lg:flex-row">
+    <>
       {/* Main A2UI Dashboard Area */}
-      <div className="min-w-0 flex-1">
+      <SidebarInset className="min-w-0 bg-transparent">
         <div
           className={cn(
-            "mx-auto space-y-4 px-4 py-6 sm:px-6",
+            "mx-auto w-full space-y-4 px-4 py-6 sm:px-6",
             previewDraft && compareMode === "split" ? "max-w-7xl" : "max-w-6xl",
           )}
         >
@@ -283,19 +300,6 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
                 </Badge>
               )}
             </div>
-
-            {!sidebarOpen && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="lg:hidden"
-                onClick={() => setSidebarOpen(true)}
-              >
-                <PanelRightOpen className="size-4" />
-                UI調整
-              </Button>
-            )}
           </div>
 
           {feedback && (
@@ -368,27 +372,18 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
             />
           )}
         </div>
-      </div>
+      </SidebarInset>
 
       {/* Right Edge Docked Sidebar */}
-      {sidebarOpen ? (
-        <aside className="bg-background flex w-full shrink-0 flex-col border-t lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] lg:w-96 lg:border-t-0 lg:border-l">
-          {/* Sidebar Header */}
-          <div className="flex h-12 shrink-0 items-center justify-between border-b px-4">
+      <Sidebar side="right" collapsible="offcanvas" className="top-14 h-[calc(100svh-3.5rem)]">
+        {/* Sidebar Header */}
+        <SidebarHeader className="gap-0 p-0">
+          <div className="flex h-12 shrink-0 items-center justify-between border-b pr-2 pl-4">
             <div className="flex items-center gap-2">
               <Sparkles className="text-primary size-4" />
               <span className="text-sm font-semibold">UI 調整</span>
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-8"
-              aria-label="サイドバーを折りたたむ"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <PanelRightClose className="size-4" />
-            </Button>
+            <MobileSidebarCloseButton />
           </div>
 
           {/* Sidebar Tabs */}
@@ -435,8 +430,10 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
               </button>
             </div>
           </div>
+        </SidebarHeader>
 
-          {/* Sidebar Body */}
+        {/* Sidebar Body */}
+        <SidebarContent className="gap-0 overflow-hidden">
           {panelTab === "ai" ? (
             <div className="min-h-0 flex-1">
               <A2UIChatPanel
@@ -461,158 +458,124 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
               />
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto p-4">
-              {panelTab === "history" ? (
-                <div className="space-y-3">
-                  <p className="text-muted-foreground text-xs">
-                    同じ支出データのまま、保存済みの A2UI バージョンを切り替えられます。
-                  </p>
-
-                  <div className="space-y-2">
-                    {uiVersions.map((ver) => {
-                      const isCurrent = ver.id === activeVersion?.id;
-                      return (
-                        <button
-                          key={ver.id}
-                          type="button"
-                          disabled={pending}
-                          onClick={() => handleActivateVersion(ver.id)}
-                          className={cn(
-                            "w-full cursor-pointer rounded-lg border p-3 text-left transition-colors disabled:opacity-50",
-                            isCurrent
-                              ? "border-primary bg-primary/5"
-                              : "bg-background hover:bg-accent/60",
-                          )}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="truncate text-sm font-medium">{ver.name}</span>
-                            {isCurrent ? (
-                              <Badge variant="default" className="gap-1">
-                                <Check className="size-3" />
-                                使用中
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline">v{ver.version}</Badge>
+            <ScrollArea className="min-h-0 flex-1">
+              <div className="p-4">
+                {panelTab === "history" ? (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      {uiVersions.map((ver) => {
+                        const isCurrent = ver.id === activeVersion?.id;
+                        return (
+                          <button
+                            key={ver.id}
+                            type="button"
+                            disabled={pending}
+                            onClick={() => handleActivateVersion(ver.id)}
+                            className={cn(
+                              "w-full cursor-pointer rounded-lg border p-3 text-left transition-colors disabled:opacity-50",
+                              isCurrent
+                                ? "border-primary bg-primary/5"
+                                : "bg-background hover:bg-accent/60",
                             )}
-                          </div>
-                          {ver.description && (
-                            <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-                              {ver.description}
-                            </p>
-                          )}
-                        </button>
-                      );
-                    })}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="truncate text-sm font-medium">{ver.name}</span>
+                              {isCurrent ? (
+                                <Badge variant="default" className="gap-1">
+                                  <Check className="size-3" />
+                                  使用中
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline">v{ver.version}</Badge>
+                              )}
+                            </div>
+                            {ver.description && (
+                              <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                                {ver.description}
+                              </p>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <Separator />
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={handleSwitchToEditor}
+                    >
+                      <Code2 className="size-4" />
+                      現在の JSON をベースに新規作成
+                    </Button>
                   </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="version-name" className="text-xs">
+                        新しいバージョン名
+                      </Label>
+                      <Input
+                        id="version-name"
+                        value={versionName}
+                        onChange={(e) => setVersionName(e.target.value)}
+                        placeholder="例：v4：2カラム改善版"
+                      />
+                    </div>
 
-                  <Separator />
+                    <div className="space-y-1.5">
+                      <Label htmlFor="version-desc" className="text-xs">
+                        変更メモ
+                      </Label>
+                      <Input
+                        id="version-desc"
+                        value={versionDesc}
+                        onChange={(e) => setVersionDesc(e.target.value)}
+                        placeholder="どこを改善したか"
+                      />
+                    </div>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={handleSwitchToEditor}
-                  >
-                    <Code2 className="size-4" />
-                    現在の JSON をベースに新規作成
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-muted-foreground text-xs">
-                    A2UI メッセージ配列を編集して新しいバージョンとして保存します。
-                  </p>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="a2ui-json" className="text-xs">
+                        A2UI Messages JSON
+                      </Label>
+                      <Textarea
+                        id="a2ui-json"
+                        value={editorJson}
+                        onChange={(e) => setEditorJson(e.target.value)}
+                        rows={18}
+                        className="font-mono text-xs leading-relaxed"
+                      />
+                    </div>
 
-                  <div className="space-y-1.5">
-                    <Label htmlFor="version-name" className="text-xs">
-                      新しいバージョン名
-                    </Label>
-                    <Input
-                      id="version-name"
-                      value={versionName}
-                      onChange={(e) => setVersionName(e.target.value)}
-                      placeholder="例: v4: 2カラム改善版"
-                    />
+                    {editorError && (
+                      <p className="text-destructive text-xs font-medium">{editorError}</p>
+                    )}
                   </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="version-desc" className="text-xs">
-                      変更メモ
-                    </Label>
-                    <Input
-                      id="version-desc"
-                      value={versionDesc}
-                      onChange={(e) => setVersionDesc(e.target.value)}
-                      placeholder="どこを改善したか"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="a2ui-json" className="text-xs">
-                      A2UI Messages JSON
-                    </Label>
-                    <Textarea
-                      id="a2ui-json"
-                      value={editorJson}
-                      onChange={(e) => setEditorJson(e.target.value)}
-                      rows={18}
-                      className="font-mono text-xs leading-relaxed"
-                    />
-                  </div>
-
-                  {editorError && (
-                    <p className="text-destructive text-xs font-medium">{editorError}</p>
-                  )}
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            </ScrollArea>
           )}
+        </SidebarContent>
 
-          {/* Sidebar Footer for Editor */}
-          {panelTab === "editor" && (
-            <div className="flex shrink-0 items-center justify-end gap-2 border-t px-4 py-3">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setPanelTab("history")}
-              >
-                戻る
-              </Button>
-              <Button type="button" size="sm" disabled={pending} onClick={handleSaveNewVersion}>
-                <Plus className="size-4" />
-                新バージョンとして保存
-              </Button>
-            </div>
-          )}
-        </aside>
-      ) : (
-        <aside className="bg-background hidden shrink-0 flex-col items-center border-l lg:sticky lg:top-14 lg:flex lg:h-[calc(100vh-3.5rem)] lg:w-12">
-          <div className="flex h-12 w-full items-center justify-center border-b">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-8"
-              title="UI 調整サイドバーを開く"
-              aria-label="UI 調整サイドバーを開く"
-              onClick={() => setSidebarOpen(true)}
-            >
-              <PanelRightOpen className="size-4" />
+        {/* Sidebar Footer for Editor */}
+        {panelTab === "editor" && (
+          <SidebarFooter className="flex-row items-center justify-end gap-2 border-t px-4 py-3">
+            <Button type="button" variant="ghost" size="sm" onClick={() => setPanelTab("history")}>
+              戻る
             </Button>
-          </div>
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(true)}
-            className="text-muted-foreground hover:text-foreground flex flex-1 cursor-pointer flex-col items-center gap-2 py-4 transition-colors"
-            aria-label="UI 調整サイドバーを開く"
-          >
-            <Sparkles className="size-4" />
-            <span className="text-xs font-medium [writing-mode:vertical-rl]">UI 調整</span>
-          </button>
-        </aside>
-      )}
-    </div>
+            <Button type="button" size="sm" disabled={pending} onClick={handleSaveNewVersion}>
+              <Plus className="size-4" />
+              新バージョンとして保存
+            </Button>
+          </SidebarFooter>
+        )}
+
+        <SidebarRail />
+      </Sidebar>
+    </>
   );
 }

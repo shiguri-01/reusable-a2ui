@@ -1,11 +1,52 @@
-import { Link } from "@void/react";
-import { Layers, ReceiptText, Wallet } from "lucide-react";
+import type { CSSProperties, ReactNode } from "react";
+import { Link, useRouter } from "@void/react";
+import { Layers, PanelRight, ReceiptText, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
 import "./style.css";
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+function HeaderSidebarToggle() {
+  const { open, openMobile, isMobile, toggleSidebar } = useSidebar();
+  const isOpen = isMobile ? openMobile : open;
+
   return (
-    <div className="bg-muted/30 flex min-h-screen flex-col">
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className={cn(
+        "gap-1.5 text-xs",
+        isOpen ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
+      )}
+      aria-label={isOpen ? "UI 調整パネルを閉じる" : "UI 調整パネルを開く"}
+      aria-expanded={isOpen}
+      title="UI 調整パネルを開閉 (Ctrl+B)"
+      onClick={toggleSidebar}
+    >
+      <PanelRight className="size-4" />
+      <span className="hidden sm:inline">UI 調整</span>
+    </Button>
+  );
+}
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const isDashboard = router.path === "/";
+
+  return (
+    <SidebarProvider
+      defaultOpen
+      className="bg-muted/30 flex min-h-screen flex-col"
+      style={
+        {
+          "--sidebar-width": "24rem",
+          "--sidebar-width-mobile": "22rem",
+        } as CSSProperties
+      }
+    >
       <header className="bg-background/95 supports-backdrop-filter:bg-background/80 sticky top-0 z-30 border-b backdrop-blur">
         <div className="flex h-14 items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3">
@@ -20,26 +61,39 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Badge>
           </div>
 
-          <nav className="flex items-center gap-1 text-sm">
-            <Link
-              href="/"
-              className="text-muted-foreground hover:bg-accent hover:text-foreground data-void-active:bg-accent data-void-active:text-foreground inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors"
-            >
-              <Layers className="size-4" />
-              <span>ダッシュボード (A2UI)</span>
-            </Link>
-            <Link
-              href="/expenses"
-              className="text-muted-foreground hover:bg-accent hover:text-foreground data-void-active:bg-accent data-void-active:text-foreground inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors"
-            >
-              <ReceiptText className="size-4" />
-              <span>支出一覧</span>
-            </Link>
-          </nav>
+          <div className="flex items-center gap-2">
+            <nav className="flex items-center gap-1 text-sm">
+              <Link
+                href="/"
+                className="text-muted-foreground hover:bg-accent hover:text-foreground data-void-active:bg-accent data-void-active:text-foreground inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors"
+              >
+                <Layers className="size-4" />
+                <span>ダッシュボード (A2UI)</span>
+              </Link>
+              <Link
+                href="/expenses"
+                className="text-muted-foreground hover:bg-accent hover:text-foreground data-void-active:bg-accent data-void-active:text-foreground inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors"
+              >
+                <ReceiptText className="size-4" />
+                <span>支出一覧</span>
+              </Link>
+            </nav>
+
+            {isDashboard && (
+              <>
+                <Separator orientation="vertical" className="h-5" />
+                <HeaderSidebarToggle />
+              </>
+            )}
+          </div>
         </div>
       </header>
 
-      <main className="flex-1">{children}</main>
-    </div>
+      {isDashboard ? (
+        <div className="flex min-h-[calc(100svh-3.5rem)] w-full flex-1">{children}</div>
+      ) : (
+        <main className="flex-1">{children}</main>
+      )}
+    </SidebarProvider>
   );
 }

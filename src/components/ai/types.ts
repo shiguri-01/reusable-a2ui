@@ -39,5 +39,5 @@ export function getPrecedingUserText(messages: UIMessage[], assistantIndex: numb
 export function summarizePromptForVersionName(prompt: string, nextVersionNumber: number): string {
   const cleaned = prompt.replace(/\s+/g, " ").trim();
   const short = cleaned.length > 18 ? `${cleaned.slice(0, 18)}…` : cleaned;
-  return `v${nextVersionNumber}: ${short || "AI生成"}`;
+  return `v${nextVersionNumber}：${short || "AI生成"}`;
 }

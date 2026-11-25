@@ -8,7 +8,6 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -16,6 +15,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -112,9 +118,6 @@ export default function ExpensesPage({ expenses }: Props) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">支出一覧</h1>
-          <p className="text-muted-foreground text-sm">
-            A2UI ダッシュボードと共通のデータベースを参照している通常の管理画面です。
-          </p>
         </div>
         <div className="flex items-end justify-between gap-4 sm:justify-end">
           <div className="text-right">
@@ -137,9 +140,6 @@ export default function ExpensesPage({ expenses }: Props) {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>支出を追加</DialogTitle>
-                <DialogDescription>
-                  ここで追加したログは A2UI ダッシュボードにも即反映されます。
-                </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleCreate} className="space-y-4">
                 <div className="space-y-1.5">
@@ -148,7 +148,7 @@ export default function ExpensesPage({ expenses }: Props) {
                     id="exp-title"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="例: ランチ、電車賃"
+                    placeholder="例：ランチ、電車賃"
                     required
                   />
                 </div>
@@ -163,23 +163,24 @@ export default function ExpensesPage({ expenses }: Props) {
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
                       placeholder="1000"
+                      className="text-right tabular-nums"
                       required
                     />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="exp-category">カテゴリ</Label>
-                    <select
-                      id="exp-category"
-                      value={formCategory}
-                      onChange={(e) => setFormCategory(e.target.value)}
-                      className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
-                    >
-                      {EXPENSE_CATEGORIES.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
-                    </select>
+                    <Select value={formCategory} onValueChange={setFormCategory}>
+                      <SelectTrigger id="exp-category">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EXPENSE_CATEGORIES.map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -254,7 +255,7 @@ export default function ExpensesPage({ expenses }: Props) {
 
         <CardContent>
           {filtered.length === 0 ? (
-            <div className="text-muted-foreground rounded-lg border border-dashed py-12 text-center text-sm">
+            <div className="text-muted-foreground py-12 text-center text-sm">
               条件に一致する支出ログがありません。
             </div>
           ) : (

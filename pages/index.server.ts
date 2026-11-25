@@ -16,7 +16,31 @@ async function ensureDefaultUiVersions() {
     .orderBy(asc(uiVersions.version));
 
   if (existing.length > 0) {
-    return existing;
+    let updated = false;
+    for (const row of existing) {
+      const preset = PRESET_UI_VERSIONS.find((p) => p.version === row.version);
+      if (!preset) continue;
+      const nextJson = JSON.stringify(preset.messages, null, 2);
+      if (row.name.includes(": ") || row.messagesJson.includes("例: ")) {
+        await db
+          .update(uiVersions)
+          .set({
+            name: preset.name,
+            description: preset.description,
+            messagesJson: nextJson,
+          })
+          .where(eq(uiVersions.id, row.id));
+        updated = true;
+      }
+    }
+    if (!updated) {
+      return existing;
+    }
+    return await db
+      .select()
+      .from(uiVersions)
+      .where(eq(uiVersions.surfaceId, SURFACE_ID))
+      .orderBy(asc(uiVersions.version));
   }
 
   await db.insert(uiVersions).values(
@@ -97,7 +121,7 @@ export const actions = {
     if (!validated.success) {
       const firstIssue = validated.error.issues[0];
       throw new ValidationError({
-        messagesJson: `A2UIスキーマエラー: ${firstIssue?.path.join(".") || "root"} - ${firstIssue?.message ?? "不正な形式"}`,
+        messagesJson: `A2UIスキーマエラー：${firstIssue?.path.join(".") || "root"} - ${firstIssue?.message ?? "不正な形式"}`,
       });
     }
 

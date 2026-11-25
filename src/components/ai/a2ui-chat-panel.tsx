@@ -8,6 +8,7 @@ import {
   extractA2UIFromText,
 } from "@/a2ui/prompt";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import {
   CodexAppServerClient,
@@ -199,8 +200,8 @@ export function A2UIChatPanel({
 
       {/* Conversation */}
       <div className="relative min-h-0 flex-1">
-        <div ref={scrollRef} className="h-full overflow-y-auto px-4 py-3">
-          <div ref={contentRef} className="space-y-3">
+        <ScrollArea className="h-full" viewportRef={scrollRef}>
+          <div ref={contentRef} className="space-y-3 px-4 py-3">
             {messages.length === 0 ? (
               <div className="space-y-1.5 py-2">
                 <div className="text-muted-foreground text-[11px] font-medium">プロンプト例</div>
@@ -250,7 +251,7 @@ export function A2UIChatPanel({
               </div>
             )}
           </div>
-        </div>
+        </ScrollArea>
 
         {!isAtBottom && messages.length > 0 && (
           <Button

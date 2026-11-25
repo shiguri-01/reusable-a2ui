@@ -79,7 +79,7 @@ export function buildExpenseDataModel(
       average,
       averageFormatted: `平均 ${formatYen(average)} / 回`,
       topCategory,
-      topCategoryLabel: `最多: ${topCategory}`,
+      topCategoryLabel: `最多：${topCategory}`,
       periodLabel: "全期間の支出合計",
     },
     budget: {

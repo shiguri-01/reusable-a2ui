@@ -11,7 +11,7 @@ export interface PresetUiVersion {
 export const PRESET_UI_VERSIONS: PresetUiVersion[] = [
   {
     version: 1,
-    name: "v1: シンプル記録",
+    name: "v1：シンプル記録",
     description: "まずは金額と内容だけ素早く記録できる最小構成のダッシュボード",
     messages: [
       {
@@ -37,7 +37,6 @@ export const PRESET_UI_VERSIONS: PresetUiVersion[] = [
               id: "quick-form-card",
               component: "Card",
               title: "支出を記録",
-              description: "金額とメモだけでサッと追加できます",
               children: ["form-row", "submit-btn"],
             },
             {
@@ -51,7 +50,7 @@ export const PRESET_UI_VERSIONS: PresetUiVersion[] = [
               component: "TextField",
               label: "内容",
               bindPath: "/form/title",
-              placeholder: "例: カフェラテ、ランチ",
+              placeholder: "例：カフェラテ、ランチ",
               required: true,
             },
             {
@@ -89,7 +88,7 @@ export const PRESET_UI_VERSIONS: PresetUiVersion[] = [
   },
   {
     version: 2,
-    name: "v2: KPIサマリー＆カテゴリ追加",
+    name: "v2：KPIサマリー＆カテゴリ追加",
     description: "合計金額や平均が見えるKPIカードと、カテゴリ・日付入力を追加",
     messages: [
       {
@@ -150,7 +149,6 @@ export const PRESET_UI_VERSIONS: PresetUiVersion[] = [
               id: "form-card",
               component: "Card",
               title: "新しい支出を登録",
-              description: "カテゴリと日付を付けて整理しやすく記録します",
               children: ["title-field", "amount-date-row", "category-field", "submit-btn"],
             },
             {
@@ -158,7 +156,7 @@ export const PRESET_UI_VERSIONS: PresetUiVersion[] = [
               component: "TextField",
               label: "内容",
               bindPath: "/form/title",
-              placeholder: "例: スーパーで食材購入",
+              placeholder: "例：スーパーで食材購入",
               required: true,
             },
             {
@@ -200,7 +198,6 @@ export const PRESET_UI_VERSIONS: PresetUiVersion[] = [
               id: "list-card",
               component: "Card",
               title: "最近の支出ログ",
-              description: "最新10件を表示しています",
               children: ["expense-list"],
             },
             {
@@ -218,7 +215,7 @@ export const PRESET_UI_VERSIONS: PresetUiVersion[] = [
   },
   {
     version: 3,
-    name: "v3: 予算管理＆カテゴリ分析",
+    name: "v3：予算管理＆カテゴリ分析",
     description: "予算消化バー・カテゴリ別内訳・絞り込みフィルタ・削除操作を備えたフル機能版",
     messages: [
       {
@@ -273,7 +270,6 @@ export const PRESET_UI_VERSIONS: PresetUiVersion[] = [
               id: "budget-card",
               component: "Card",
               title: "月間予算トラッカー",
-              description: "設定した予算に対する消化状況",
               children: ["budget-progress"],
             },
             {
@@ -301,7 +297,6 @@ export const PRESET_UI_VERSIONS: PresetUiVersion[] = [
               id: "form-card",
               component: "Card",
               title: "支出を記録",
-              description: "フォーム入力は A2UI Data Model にバインドされています",
               children: ["title-field", "amount-category-row", "date-note-row", "submit-btn"],
             },
             {
@@ -309,7 +304,7 @@ export const PRESET_UI_VERSIONS: PresetUiVersion[] = [
               component: "TextField",
               label: "内容",
               bindPath: "/form/title",
-              placeholder: "例: コーヒー豆、電車賃",
+              placeholder: "例：コーヒー豆、電車賃",
               required: true,
             },
             {
@@ -364,7 +359,6 @@ export const PRESET_UI_VERSIONS: PresetUiVersion[] = [
               id: "breakdown-card",
               component: "Card",
               title: "カテゴリ別内訳",
-              description: "金額の大きい順に集計しています",
               children: ["category-breakdown"],
             },
             {
@@ -375,8 +369,7 @@ export const PRESET_UI_VERSIONS: PresetUiVersion[] = [
             {
               id: "right-col",
               component: "Card",
-              title: "支出ログ（フィルタ対応）",
-              description: "カテゴリチップで絞り込み・行の削除ができます",
+              title: "支出ログ",
               children: ["filter-chips", "expense-list"],
             },
             {

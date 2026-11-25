@@ -20,6 +20,7 @@ export function buildA2UIDeveloperInstructions(): string {
     "- 配列は最低2要素: 1) createSurface, 2) updateComponents。",
     "- すべての children に参照される id は components 配列内に必ず存在させる。",
     "- すべてのコンポーネントは必ず一意の id と以下のカタログ内の component 名のみを使う。",
+    "- Card の description や見出しの補足など、見ればわかる自明な説明文は書かない。",
     "",
     "## 利用可能なコンポーネントカタログ",
     '- Column: { id, component: "Column", children: string[], gap?: "sm"|"md"|"lg" }',
@@ -99,7 +100,7 @@ export function extractA2UIFromText(text: string): ExtractedA2UIResult | null {
     return {
       rawJson: lastMatch,
       messages: null,
-      error: `A2UI スキーマ検証エラー (${firstIssue?.path.join(".") || "root"}: ${firstIssue?.message ?? "不正な形式"})`,
+      error: `A2UI スキーマ検証エラー（${firstIssue?.path.join(".") || "root"}：${firstIssue?.message ?? "不正な形式"}）`,
     };
   }
 
