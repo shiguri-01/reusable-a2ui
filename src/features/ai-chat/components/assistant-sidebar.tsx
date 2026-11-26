@@ -202,7 +202,7 @@ export function AssistantSidebar() {
       <div className="hidden w-12 shrink-0 md:block" aria-hidden="true" />
       <aside
         aria-label="サイドパネル切替"
-        className="bg-background/95 md:bg-muted/60 md:border-sidebar-border fixed right-3 bottom-4 z-30 flex items-center gap-1 rounded-full border p-1 shadow-md backdrop-blur md:top-14 md:right-0 md:bottom-0 md:z-20 md:w-12 md:flex-col md:items-stretch md:gap-1.5 md:rounded-none md:border-0 md:border-l md:px-0 md:py-2.5 md:shadow-none md:backdrop-blur-none"
+        className="bg-background md:bg-muted md:border-sidebar-border fixed right-3 bottom-4 z-30 flex items-center gap-1 rounded-full border p-1 shadow-md md:top-14 md:right-0 md:bottom-0 md:z-20 md:w-12 md:flex-col md:items-stretch md:gap-1.5 md:rounded-none md:border-0 md:border-l md:px-0 md:py-2.5 md:shadow-none"
       >
         <PanelToggle
           label="AI アシスタント"

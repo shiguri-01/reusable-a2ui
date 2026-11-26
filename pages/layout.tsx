@@ -35,7 +35,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 </span>
                 <span>支出ログ</span>
               </Link>
-              <Badge variant="secondary" className="hidden sm:inline-flex">
+              <Badge
+                variant="secondary"
+                className="hidden border-0 bg-[linear-gradient(135deg,oklch(0.88_0.08_15/0.24),oklch(0.91_0.08_85/0.24),oklch(0.89_0.08_155/0.24),oklch(0.88_0.08_235/0.24),oklch(0.88_0.08_305/0.24))] sm:inline-flex dark:bg-[linear-gradient(135deg,oklch(0.65_0.09_15/0.13),oklch(0.7_0.08_85/0.13),oklch(0.66_0.08_155/0.13),oklch(0.65_0.09_235/0.13),oklch(0.65_0.09_305/0.13))]"
+              >
                 A2UI Demo
               </Badge>
             </div>
