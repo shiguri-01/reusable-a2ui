@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { AlertCircle, AlertTriangle, CheckCircle2, Info } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -14,10 +15,10 @@ type DisplayNode = Extract<
 >;
 
 const ALERT_STYLES = {
-  info: "bg-muted/70 text-foreground",
-  success: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-  warning: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
-  destructive: "bg-destructive/10 text-destructive",
+  info: "bg-muted/70 text-foreground border-transparent",
+  success: "bg-emerald-500/10 text-emerald-700 border-transparent dark:text-emerald-400",
+  warning: "bg-amber-500/10 text-amber-700 border-transparent dark:text-amber-400",
+  destructive: "bg-destructive/10 text-destructive border-transparent",
 } as const;
 
 const ALERT_ICONS = {
@@ -189,19 +190,18 @@ export function renderDisplayNode(node: DisplayNode, ctx: A2UIRenderContext): Re
       const Icon = ALERT_ICONS[variant];
 
       return (
-        <div
+        <Alert
           key={node.id}
-          className={cn(
-            "flex items-start gap-2.5 rounded-lg px-3 py-2.5 text-xs",
-            ALERT_STYLES[variant],
-          )}
+          variant={variant === "destructive" ? "destructive" : "default"}
+          role={variant === "destructive" || variant === "warning" ? "alert" : "status"}
+          className={cn("px-3 py-2.5 text-xs", ALERT_STYLES[variant])}
         >
-          <Icon className="mt-0.5 size-4 shrink-0" />
-          <div className="min-w-0 space-y-0.5">
-            {title && <div className="font-semibold">{title}</div>}
-            <p className="leading-relaxed">{text}</p>
-          </div>
-        </div>
+          <Icon />
+          {title && <AlertTitle className="font-semibold">{title}</AlertTitle>}
+          <AlertDescription className="text-xs leading-relaxed text-current">
+            {text}
+          </AlertDescription>
+        </Alert>
       );
     }
   }

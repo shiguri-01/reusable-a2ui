@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { UIMessage } from "ai";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { DataModel } from "@/features/a2ui/data-model";
 import { parseInlineA2UIResponse } from "@/features/a2ui/response";
 import type { A2UIAction } from "@/features/a2ui/types";
@@ -56,25 +57,19 @@ export function ChatMessageItem({
       className={cn("shadcn-scrollbar flex flex-col gap-2", isUser ? "items-end" : "items-start")}
     >
       {!isUser && reasoningContent && (
-        <div className="w-full">
-          <button
-            type="button"
-            onClick={() => setReasoningOpen((prev) => !prev)}
-            className="text-muted-foreground hover:text-foreground inline-flex cursor-pointer items-center gap-1 text-xs"
-          >
+        <Collapsible open={reasoningOpen} onOpenChange={setReasoningOpen} className="w-full">
+          <CollapsibleTrigger className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs outline-none focus-visible:ring-2">
             {reasoningOpen ? (
               <ChevronDown className="size-3.5" />
             ) : (
               <ChevronRight className="size-3.5" />
             )}
             思考プロセス
-          </button>
-          {reasoningOpen && (
-            <div className="bg-muted/40 text-muted-foreground mt-1.5 rounded-md border px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap">
-              {reasoningContent}
-            </div>
-          )}
-        </div>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="bg-muted/40 text-muted-foreground mt-1.5 rounded-md border px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap">
+            {reasoningContent}
+          </CollapsibleContent>
+        </Collapsible>
       )}
 
       {!isUser && toolParts.length > 0 && (

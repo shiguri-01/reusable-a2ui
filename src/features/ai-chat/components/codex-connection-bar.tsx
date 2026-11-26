@@ -30,15 +30,17 @@ function CommandCopyRow() {
   return (
     <div className="bg-background flex items-center justify-between gap-2 rounded border px-2.5 py-1.5 font-mono text-xs">
       <code className="truncate">{SERVER_START_COMMAND}</code>
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon"
         onClick={() => void handleCopyCommand()}
-        className="text-muted-foreground hover:text-foreground inline-flex shrink-0 cursor-pointer items-center"
+        className="text-muted-foreground hover:text-foreground size-6 shrink-0"
         title="コピー"
         aria-label="起動コマンドをコピー"
       >
         {copiedCmd ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-      </button>
+      </Button>
     </div>
   );
 }

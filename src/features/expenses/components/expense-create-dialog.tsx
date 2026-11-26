@@ -11,8 +11,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -62,92 +62,96 @@ export function ExpenseCreateDialog() {
           <DialogTitle>支出を追加</DialogTitle>
         </DialogHeader>
         <Form form={form} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="exp-title">内容</Label>
-            <Input
-              id="exp-title"
-              name="title"
-              value={form.data.title}
-              onChange={(e) => form.setData("title", e.target.value)}
-              placeholder="例：ランチ、電車賃"
-              required
-            />
-            {form.errors.title && (
-              <p className="text-destructive text-xs font-medium">{form.errors.title}</p>
-            )}
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="exp-amount">金額 (円)</Label>
+          <FieldGroup>
+            <Field data-invalid={Boolean(form.errors.title) || undefined}>
+              <FieldLabel htmlFor="exp-title">内容</FieldLabel>
               <Input
-                id="exp-amount"
-                name="amount"
-                type="number"
-                inputMode="numeric"
-                min={1}
-                value={form.data.amount > 0 ? String(form.data.amount) : ""}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  form.setData("amount", raw === "" ? 0 : Math.round(Number(raw)));
-                }}
-                placeholder="1000"
-                className="text-right tabular-nums"
+                id="exp-title"
+                name="title"
+                value={form.data.title}
+                onChange={(e) => form.setData("title", e.target.value)}
+                placeholder="例：ランチ、電車賃"
+                aria-invalid={Boolean(form.errors.title) || undefined}
+                aria-describedby={form.errors.title ? "exp-title-error" : undefined}
                 required
               />
-              {form.errors.amount && (
-                <p className="text-destructive text-xs font-medium">{form.errors.amount}</p>
-              )}
+              <FieldError id="exp-title-error">{form.errors.title}</FieldError>
+            </Field>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field data-invalid={Boolean(form.errors.amount) || undefined}>
+                <FieldLabel htmlFor="exp-amount">金額 (円)</FieldLabel>
+                <Input
+                  id="exp-amount"
+                  name="amount"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  value={form.data.amount > 0 ? String(form.data.amount) : ""}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    form.setData("amount", raw === "" ? 0 : Math.round(Number(raw)));
+                  }}
+                  placeholder="1000"
+                  className="text-right tabular-nums"
+                  aria-invalid={Boolean(form.errors.amount) || undefined}
+                  aria-describedby={form.errors.amount ? "exp-amount-error" : undefined}
+                  required
+                />
+                <FieldError id="exp-amount-error">{form.errors.amount}</FieldError>
+              </Field>
+              <Field data-invalid={Boolean(form.errors.category) || undefined}>
+                <FieldLabel htmlFor="exp-category">カテゴリ</FieldLabel>
+                <Select
+                  value={form.data.category}
+                  onValueChange={(value) => form.setData("category", value)}
+                >
+                  <SelectTrigger
+                    id="exp-category"
+                    aria-invalid={Boolean(form.errors.category) || undefined}
+                    aria-describedby={form.errors.category ? "exp-category-error" : undefined}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EXPENSE_CATEGORIES.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldError id="exp-category-error">{form.errors.category}</FieldError>
+              </Field>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="exp-category">カテゴリ</Label>
-              <Select
-                value={form.data.category}
-                onValueChange={(value) => form.setData("category", value)}
-              >
-                <SelectTrigger id="exp-category">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {EXPENSE_CATEGORIES.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {form.errors.category && (
-                <p className="text-destructive text-xs font-medium">{form.errors.category}</p>
-              )}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field data-invalid={Boolean(form.errors.spentAt) || undefined}>
+                <FieldLabel htmlFor="exp-date">日付</FieldLabel>
+                <Input
+                  id="exp-date"
+                  name="spentAt"
+                  type="date"
+                  value={form.data.spentAt}
+                  onChange={(e) => form.setData("spentAt", e.target.value)}
+                  aria-invalid={Boolean(form.errors.spentAt) || undefined}
+                  aria-describedby={form.errors.spentAt ? "exp-date-error" : undefined}
+                />
+                <FieldError id="exp-date-error">{form.errors.spentAt}</FieldError>
+              </Field>
+              <Field data-invalid={Boolean(form.errors.note) || undefined}>
+                <FieldLabel htmlFor="exp-note">メモ（任意）</FieldLabel>
+                <Input
+                  id="exp-note"
+                  name="note"
+                  value={form.data.note}
+                  onChange={(e) => form.setData("note", e.target.value)}
+                  placeholder="お店の名前など"
+                  aria-invalid={Boolean(form.errors.note) || undefined}
+                  aria-describedby={form.errors.note ? "exp-note-error" : undefined}
+                />
+                <FieldError id="exp-note-error">{form.errors.note}</FieldError>
+              </Field>
             </div>
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="exp-date">日付</Label>
-              <Input
-                id="exp-date"
-                name="spentAt"
-                type="date"
-                value={form.data.spentAt}
-                onChange={(e) => form.setData("spentAt", e.target.value)}
-              />
-              {form.errors.spentAt && (
-                <p className="text-destructive text-xs font-medium">{form.errors.spentAt}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="exp-note">メモ（任意）</Label>
-              <Input
-                id="exp-note"
-                name="note"
-                value={form.data.note}
-                onChange={(e) => form.setData("note", e.target.value)}
-                placeholder="お店の名前など"
-              />
-              {form.errors.note && (
-                <p className="text-destructive text-xs font-medium">{form.errors.note}</p>
-              )}
-            </div>
-          </div>
+          </FieldGroup>
 
           <DialogFooter>
             <DialogClose asChild>

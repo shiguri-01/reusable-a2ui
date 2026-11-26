@@ -4,6 +4,7 @@ import { A2UISurface } from "@/features/a2ui/components/a2ui-surface";
 import type { DataModel } from "@/features/a2ui/data-model";
 import type { A2UIAction, A2UIMessage } from "@/features/a2ui/types";
 import type { AiPreviewDraft, CompareMode } from "@/features/ai-chat/types";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -80,15 +81,25 @@ export function DashboardCanvas({
       </div>
 
       {feedback && (
-        <div
+        <Alert
+          variant={feedback.type === "error" ? "destructive" : "default"}
+          role={feedback.type === "error" ? "alert" : "status"}
           className={
             feedback.type === "error"
-              ? "bg-destructive/10 text-destructive rounded-md px-3 py-2 text-xs font-medium"
-              : "bg-secondary text-secondary-foreground rounded-md px-3 py-2 text-xs font-medium"
+              ? "bg-destructive/10 border-destructive/20 px-3 py-2 text-xs font-medium"
+              : "bg-secondary text-secondary-foreground border-transparent px-3 py-2 text-xs font-medium"
           }
         >
-          {feedback.message}
-        </div>
+          <AlertDescription
+            className={
+              feedback.type === "error"
+                ? "text-xs font-medium"
+                : "text-secondary-foreground text-xs font-medium"
+            }
+          >
+            {feedback.message}
+          </AlertDescription>
+        </Alert>
       )}
 
       {previewDraft && compareMode === "split" ? (

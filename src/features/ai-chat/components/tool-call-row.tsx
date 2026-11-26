@@ -1,6 +1,8 @@
 import { useState } from "react";
 import type { UIMessage } from "ai";
 import { AlertCircle, Check, ChevronDown, ChevronRight, Eye, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { extractDashboardDraft } from "@/features/a2ui/draft";
 import { MCP_TOOL_LABELS } from "@/features/mcp/tool-metadata";
 import type { AiPreviewDraft } from "../types";
@@ -35,12 +37,12 @@ export function ToolCallRow({
 
   return (
     <div className="space-y-1">
-      <div className="bg-muted/60 w-full rounded-md px-3 py-2 text-xs">
-        <button
-          type="button"
-          onClick={() => setOpen((prev) => !prev)}
-          className="flex w-full cursor-pointer items-center justify-between gap-2 text-left"
-        >
+      <Collapsible
+        open={open}
+        onOpenChange={setOpen}
+        className="bg-muted/60 w-full rounded-md px-3 py-2 text-xs"
+      >
+        <CollapsibleTrigger className="focus-visible:ring-ring/50 flex w-full cursor-pointer items-center justify-between gap-2 rounded-sm text-left outline-none focus-visible:ring-2">
           <span className="flex min-w-0 items-center gap-1.5 font-medium">
             {isRunning ? (
               <Loader2 className="text-primary size-3.5 shrink-0 animate-spin" />
@@ -55,34 +57,32 @@ export function ToolCallRow({
             {isRunning ? "実行中..." : isError ? "エラー" : "完了"}
             {open ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
           </span>
-        </button>
+        </CollapsibleTrigger>
 
-        {open && (
-          <div className="text-muted-foreground mt-2 space-y-2 font-mono text-[11px] leading-relaxed">
-            {part.input !== undefined && (
-              <div>
-                <div className="font-sans text-xs font-medium">入力</div>
-                <pre className="bg-background/80 mt-1 max-h-36 overflow-auto rounded p-2 whitespace-pre-wrap">
-                  {JSON.stringify(part.input, null, 2)}
-                </pre>
-              </div>
-            )}
-            {part.state === "output-available" && (
-              <div>
-                <div className="font-sans text-xs font-medium">結果</div>
-                <pre className="bg-background/80 mt-1 max-h-44 overflow-auto rounded p-2 whitespace-pre-wrap">
-                  {typeof part.output === "string"
-                    ? part.output
-                    : JSON.stringify(part.output, null, 2)}
-                </pre>
-              </div>
-            )}
-            {part.state === "output-error" && (
-              <div className="text-destructive font-sans text-xs">{part.errorText}</div>
-            )}
-          </div>
-        )}
-      </div>
+        <CollapsibleContent className="text-muted-foreground mt-2 space-y-2 font-mono text-[11px] leading-relaxed">
+          {part.input !== undefined && (
+            <div>
+              <div className="font-sans text-xs font-medium">入力</div>
+              <pre className="bg-background/80 mt-1 max-h-36 overflow-auto rounded p-2 whitespace-pre-wrap">
+                {JSON.stringify(part.input, null, 2)}
+              </pre>
+            </div>
+          )}
+          {part.state === "output-available" && (
+            <div>
+              <div className="font-sans text-xs font-medium">結果</div>
+              <pre className="bg-background/80 mt-1 max-h-44 overflow-auto rounded p-2 whitespace-pre-wrap">
+                {typeof part.output === "string"
+                  ? part.output
+                  : JSON.stringify(part.output, null, 2)}
+              </pre>
+            </div>
+          )}
+          {part.state === "output-error" && (
+            <div className="text-destructive font-sans text-xs">{part.errorText}</div>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
 
       {dashboardDraft && (
         <div className="flex min-h-6 items-center px-1 text-xs">
@@ -92,14 +92,16 @@ export function ToolCallRow({
               {isApplied ? "適用済み" : "プレビュー中"}
             </span>
           ) : (
-            <button
+            <Button
               type="button"
+              variant="link"
+              size="sm"
               onClick={() => onPreview(dashboardDraft)}
-              className="text-primary hover:text-primary/80 inline-flex cursor-pointer items-center gap-1.5 underline underline-offset-2"
+              className="h-auto gap-1.5 p-0 text-xs underline underline-offset-2"
             >
               <Eye className="size-3.5" />
               プレビューを開く（{dashboardDraft.name}）
-            </button>
+            </Button>
           )}
         </div>
       )}

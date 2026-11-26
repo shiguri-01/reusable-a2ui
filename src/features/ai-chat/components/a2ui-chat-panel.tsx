@@ -3,6 +3,7 @@ import { AlertCircle, ArrowDown, ArrowUp, Loader2, Square } from "lucide-react";
 import { useStickToBottom } from "use-stick-to-bottom";
 import type { DataModel } from "@/features/a2ui/data-model";
 import type { A2UIAction } from "@/features/a2ui/types";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
@@ -106,15 +107,16 @@ export function A2UIChatPanel({
                 <div className="text-muted-foreground text-xs font-medium">プロンプト例</div>
                 <div className="space-y-1.5">
                   {QUICK_PROMPTS.map((prompt) => (
-                    <button
+                    <Button
                       key={prompt}
                       type="button"
+                      variant="outline"
                       disabled={isStreaming}
                       onClick={() => void handleSendText(prompt)}
-                      className="bg-background hover:bg-accent/60 w-full cursor-pointer rounded-md border px-3 py-2 text-left text-sm leading-snug transition-colors disabled:opacity-50"
+                      className="h-auto w-full justify-start px-3 py-2 text-left text-sm leading-snug font-normal whitespace-normal"
                     >
                       {prompt}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -160,10 +162,13 @@ export function A2UIChatPanel({
               )}
 
             {error && (
-              <div className="bg-destructive/10 text-destructive flex items-start gap-2 rounded-md border border-destructive/20 p-2.5 text-sm">
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                <span className="leading-relaxed">{error.message}</span>
-              </div>
+              <Alert
+                variant="destructive"
+                className="bg-destructive/10 border-destructive/20 px-3 py-2.5"
+              >
+                <AlertCircle />
+                <AlertDescription className="leading-relaxed">{error.message}</AlertDescription>
+              </Alert>
             )}
           </div>
         </ScrollArea>
@@ -204,13 +209,15 @@ export function A2UIChatPanel({
         {autoApproveSession && (
           <div className="text-muted-foreground flex items-center justify-between gap-2 px-0.5 text-[11px]">
             <span>この会話中は削除などの MCP 操作を自動許可中</span>
-            <button
+            <Button
               type="button"
+              variant="link"
+              size="sm"
               onClick={() => setAutoApproveSession(false)}
-              className="text-primary hover:text-primary/80 cursor-pointer underline underline-offset-2"
+              className="h-auto p-0 text-[11px] underline underline-offset-2"
             >
               解除
-            </button>
+            </Button>
           </div>
         )}
         <div className="bg-background focus-within:ring-ring relative rounded-lg border focus-within:ring-1">
