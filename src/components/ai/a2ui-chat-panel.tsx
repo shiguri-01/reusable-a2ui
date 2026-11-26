@@ -12,10 +12,12 @@ import {
   CodexAppServerClient,
   DEFAULT_CODEX_WS_URL,
   type CodexClientStatus,
+  type McpElicitationRequest,
 } from "@/lib/codex/client";
 import { CodexChatTransport } from "@/lib/codex/transport";
 import { ChatMessageItem } from "./chat-message-item";
 import { CodexConnectionBar } from "./codex-connection-bar";
+import { McpApprovalCard } from "./mcp-approval-card";
 import { PreviewCompareDock } from "./preview-compare-dock";
 import type { AiPreviewDraft, CompareMode } from "./types";
 
@@ -73,6 +75,11 @@ export function A2UIChatPanel({
   const [wsUrlInput, setWsUrlInput] = useState(getInitialWsUrl);
   const [showSettings, setShowSettings] = useState(false);
   const [input, setInput] = useState("");
+  const [pendingElicitations, setPendingElicitations] = useState<McpElicitationRequest[]>([]);
+  const [autoApproveSession, setAutoApproveSession] = useState(false);
+
+  const autoApproveSessionRef = useRef(autoApproveSession);
+  autoApproveSessionRef.current = autoApproveSession;
 
   const latestContextRef = useRef({ activeVersionName, currentMessagesJson });
   latestContextRef.current = { activeVersionName, currentMessagesJson };
@@ -87,12 +94,43 @@ export function A2UIChatPanel({
   const [codexStatus, setCodexStatus] = useState<CodexClientStatus>(() => client.getStatus());
 
   useEffect(() => {
-    const unsubscribe = client.subscribeStatus(setCodexStatus);
+    const unsubscribeStatus = client.subscribeStatus((nextStatus) => {
+      setCodexStatus(nextStatus);
+      if (nextStatus.state === "disconnected" || nextStatus.state === "error") {
+        setPendingElicitations([]);
+      }
+    });
+    const unsubscribeElicitations = client.subscribeMcpElicitations((request) => {
+      if (
+        autoApproveSessionRef.current &&
+        (request.approvalKind === "mcp_tool_call" || request.serverName === "kakeibo")
+      ) {
+        client.respondToMcpElicitation(request.requestId, {
+          action: "accept",
+          persist: request.persistOptions.includes("session") ? "session" : undefined,
+        });
+        return;
+      }
+      setPendingElicitations((prev) => {
+        if (prev.some((item) => item.requestId === request.requestId)) return prev;
+        return [...prev, request];
+      });
+    });
+    const unsubscribeNotifications = client.subscribeNotifications((method, params) => {
+      if (method === "serverRequest/resolved") {
+        const resolvedId = params.requestId;
+        if (typeof resolvedId === "string" || typeof resolvedId === "number") {
+          setPendingElicitations((prev) => prev.filter((item) => item.requestId !== resolvedId));
+        }
+      }
+    });
     void client.connect().catch(() => {
       // Connection bar guides the user to start the local server
     });
     return () => {
-      unsubscribe();
+      unsubscribeStatus();
+      unsubscribeElicitations();
+      unsubscribeNotifications();
       client.disconnect();
     };
   }, [client]);
@@ -122,6 +160,58 @@ export function A2UIChatPanel({
   const { scrollRef, contentRef, isAtBottom, scrollToBottom } = useStickToBottom();
   const isStreaming = status === "submitted" || status === "streaming";
 
+  useEffect(() => {
+    if (pendingElicitations.length > 0) {
+      void scrollToBottom();
+    }
+  }, [pendingElicitations.length, scrollToBottom]);
+
+  const activeRunningTool = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg?.role !== "assistant") continue;
+      for (let j = msg.parts.length - 1; j >= 0; j--) {
+        const part = msg.parts[j];
+        if (
+          part.type === "dynamic-tool" &&
+          (part.state === "input-available" || part.state === "input-streaming")
+        ) {
+          const params =
+            part.input && typeof part.input === "object" && !Array.isArray(part.input)
+              ? (part.input as Record<string, unknown>)
+              : undefined;
+          return { toolName: part.toolName, toolParams: params };
+        }
+      }
+    }
+    return null;
+  }, [messages]);
+
+  const cancelAllPendingElicitations = () => {
+    setPendingElicitations((prev) => {
+      for (const req of prev) {
+        client.respondToMcpElicitation(req.requestId, { action: "cancel" });
+      }
+      return [];
+    });
+  };
+
+  const handleApproveElicitation = (request: McpElicitationRequest, forSession: boolean) => {
+    if (forSession) {
+      setAutoApproveSession(true);
+    }
+    client.respondToMcpElicitation(request.requestId, {
+      action: "accept",
+      persist: forSession && request.persistOptions.includes("session") ? "session" : undefined,
+    });
+    setPendingElicitations((prev) => prev.filter((item) => item.requestId !== request.requestId));
+  };
+
+  const handleDeclineElicitation = (request: McpElicitationRequest) => {
+    client.respondToMcpElicitation(request.requestId, { action: "decline" });
+    setPendingElicitations((prev) => prev.filter((item) => item.requestId !== request.requestId));
+  };
+
   const handleConnect = async () => {
     const nextUrl = wsUrlInput.trim() || DEFAULT_CODEX_WS_URL;
     if (typeof window !== "undefined") {
@@ -138,12 +228,19 @@ export function A2UIChatPanel({
   };
 
   const handleResetChat = () => {
+    cancelAllPendingElicitations();
+    setAutoApproveSession(false);
     if (isStreaming) {
       void stop();
     }
     client.resetThread();
     setMessages([]);
     clearError();
+  };
+
+  const handleStop = () => {
+    cancelAllPendingElicitations();
+    void stop();
   };
 
   const handleSendText = async (text: string) => {
@@ -214,12 +311,27 @@ export function A2UIChatPanel({
               ))
             )}
 
-            {isStreaming && messages[messages.length - 1]?.role === "user" && (
-              <div className="text-muted-foreground flex items-center gap-1.5 text-sm">
-                <Loader2 className="size-4 animate-spin" />
-                応答中...
-              </div>
-            )}
+            {pendingElicitations.map((request) => (
+              <McpApprovalCard
+                key={String(request.requestId)}
+                request={request}
+                fallbackToolName={activeRunningTool?.toolName}
+                fallbackToolParams={activeRunningTool?.toolParams}
+                dataModel={dataModel}
+                onApprove={() => handleApproveElicitation(request, false)}
+                onApproveSession={() => handleApproveElicitation(request, true)}
+                onDecline={() => handleDeclineElicitation(request)}
+              />
+            ))}
+
+            {isStreaming &&
+              pendingElicitations.length === 0 &&
+              messages[messages.length - 1]?.role === "user" && (
+                <div className="text-muted-foreground flex items-center gap-1.5 text-sm">
+                  <Loader2 className="size-4 animate-spin" />
+                  応答中...
+                </div>
+              )}
 
             {error && (
               <div className="bg-destructive/10 text-destructive flex items-start gap-2 rounded-md border border-destructive/20 p-2.5 text-sm">
@@ -261,8 +373,20 @@ export function A2UIChatPanel({
           e.preventDefault();
           void handleSendText(input);
         }}
-        className="shrink-0 border-t p-3"
+        className="shrink-0 space-y-2 border-t p-3"
       >
+        {autoApproveSession && (
+          <div className="text-muted-foreground flex items-center justify-between gap-2 px-0.5 text-[11px]">
+            <span>この会話中は削除などの MCP 操作を自動許可中</span>
+            <button
+              type="button"
+              onClick={() => setAutoApproveSession(false)}
+              className="text-primary hover:text-primary/80 cursor-pointer underline underline-offset-2"
+            >
+              解除
+            </button>
+          </div>
+        )}
         <div className="bg-background focus-within:ring-ring relative rounded-lg border focus-within:ring-1">
           <Textarea
             value={input}
@@ -280,7 +404,7 @@ export function A2UIChatPanel({
                 size="icon"
                 className="size-7 rounded-md"
                 aria-label="停止"
-                onClick={() => void stop()}
+                onClick={handleStop}
               >
                 <Square className="size-3 fill-current" />
               </Button>
