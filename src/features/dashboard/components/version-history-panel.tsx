@@ -25,9 +25,6 @@ export function VersionHistoryPanel({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <div className="text-muted-foreground px-0.5 text-[11px] font-semibold">
-          保存済みバージョン ({uiVersions.length})
-        </div>
         {uiVersions.map((ver) => {
           const isCurrent = ver.id === activeVersionId;
           return (
@@ -45,9 +42,7 @@ export function VersionHistoryPanel({
                   onClick={() => onActivateVersion(ver.id)}
                   className="min-w-0 flex-1 cursor-pointer text-left disabled:cursor-default"
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium">{ver.name}</span>
-                  </div>
+                  <span className="block truncate text-sm font-medium">{ver.name}</span>
                   {ver.description && (
                     <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
                       {ver.description}
@@ -77,7 +72,7 @@ export function VersionHistoryPanel({
                     disabled={pending}
                     onClick={() => onActivateVersion(ver.id)}
                   >
-                    このバージョンに切替
+                    切り替える
                   </Button>
                 )}
                 <Button
@@ -100,16 +95,16 @@ export function VersionHistoryPanel({
       <Separator />
 
       <div className="space-y-2">
-        <div className="text-muted-foreground flex items-center gap-1.5 px-0.5 text-[11px] font-semibold">
+        <div className="text-muted-foreground flex items-center gap-1.5 px-0.5 text-xs font-medium">
           <Sparkles className="size-3.5" />
-          テンプレートから新しく組む
+          初期テンプレートから作成
         </div>
         <div className="grid grid-cols-1 gap-1.5">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="h-auto justify-start px-3 py-2 text-left text-xs"
+            className="justify-start px-3 text-xs"
             onClick={() =>
               onLoadIntoBuilder(
                 JSON.stringify(createEmptyDashboardMessages(), null, 2),
@@ -117,12 +112,7 @@ export function VersionHistoryPanel({
               )
             }
           >
-            <div>
-              <div className="font-semibold">白紙から自由に作成</div>
-              <div className="text-muted-foreground text-[11px] font-normal">
-                空のページにお好みのブロックを1つずつ追加します
-              </div>
-            </div>
+            白紙から作成
           </Button>
           {PRESET_UI_VERSIONS.map((preset) => (
             <Button
@@ -136,8 +126,8 @@ export function VersionHistoryPanel({
               }
             >
               <div className="min-w-0">
-                <div className="truncate font-semibold">{preset.name} テンプレート</div>
-                <div className="text-muted-foreground line-clamp-1 text-[11px] font-normal">
+                <div className="truncate font-medium">{preset.name}</div>
+                <div className="text-muted-foreground line-clamp-1 text-xs font-normal">
                   {preset.description}
                 </div>
               </div>

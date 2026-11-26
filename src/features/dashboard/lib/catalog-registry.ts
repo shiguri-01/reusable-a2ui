@@ -22,152 +22,39 @@ import {
   Type,
 } from "lucide-react";
 import { resolveValue, type DataModel } from "@/features/a2ui/data-model";
-import type { A2UIComponent } from "@/features/a2ui/types";
+import type { A2UIComponent, BoundValue } from "@/features/a2ui/types";
 import { EXPENSE_CATEGORIES } from "@/features/expenses/model";
-import type { BlockBlueprint } from "./a2ui-builder";
+import {
+  isContainerComponent,
+  type BlockBlueprint,
+  type EditableSurfaceGraph,
+} from "./a2ui-builder";
 
-export interface ComponentTypeMeta {
+interface ComponentTypeMeta {
   label: string;
-  shortLabel: string;
-  category: "layout" | "display" | "form" | "expense";
   icon: LucideIcon;
-  isContainer: boolean;
 }
 
 export const COMPONENT_META: Record<A2UIComponent["component"], ComponentTypeMeta> = {
-  Column: {
-    label: "縦並びグループ (Column)",
-    shortLabel: "縦並び",
-    category: "layout",
-    icon: Rows3,
-    isContainer: true,
-  },
-  Row: {
-    label: "横並びグループ (Row)",
-    shortLabel: "横並び",
-    category: "layout",
-    icon: Columns2,
-    isContainer: true,
-  },
-  Grid: {
-    label: "グリッド (Grid)",
-    shortLabel: "Grid",
-    category: "layout",
-    icon: LayoutGrid,
-    isContainer: true,
-  },
-  Card: {
-    label: "カード枠 (Card)",
-    shortLabel: "Card",
-    category: "layout",
-    icon: SquareStack,
-    isContainer: true,
-  },
-  Divider: {
-    label: "区切り線 (Divider)",
-    shortLabel: "区切り線",
-    category: "layout",
-    icon: Minus,
-    isContainer: false,
-  },
-  Text: {
-    label: "テキスト・見出し (Text)",
-    shortLabel: "テキスト",
-    category: "display",
-    icon: Type,
-    isContainer: false,
-  },
-  Badge: {
-    label: "バッジ (Badge)",
-    shortLabel: "バッジ",
-    category: "display",
-    icon: Tag,
-    isContainer: false,
-  },
-  MetricCard: {
-    label: "KPIカード (MetricCard)",
-    shortLabel: "KPIカード",
-    category: "display",
-    icon: CreditCard,
-    isContainer: false,
-  },
-  ProgressBar: {
-    label: "進捗バー (ProgressBar)",
-    shortLabel: "進捗バー",
-    category: "display",
-    icon: Gauge,
-    isContainer: false,
-  },
-  KeyValueList: {
-    label: "項目・値リスト (KeyValueList)",
-    shortLabel: "項目リスト",
-    category: "display",
-    icon: ListChecks,
-    isContainer: false,
-  },
-  Alert: {
-    label: "お知らせ・アラート (Alert)",
-    shortLabel: "アラート",
-    category: "display",
-    icon: AlertTriangle,
-    isContainer: false,
-  },
-  FilterChips: {
-    label: "カテゴリ絞り込み (FilterChips)",
-    shortLabel: "絞り込み",
-    category: "form",
-    icon: Filter,
-    isContainer: false,
-  },
-  TextField: {
-    label: "テキスト入力 (TextField)",
-    shortLabel: "文字入力",
-    category: "form",
-    icon: FormInput,
-    isContainer: false,
-  },
-  NumberField: {
-    label: "数値・金額入力 (NumberField)",
-    shortLabel: "数値入力",
-    category: "form",
-    icon: Hash,
-    isContainer: false,
-  },
-  DateField: {
-    label: "日付入力 (DateField)",
-    shortLabel: "日付入力",
-    category: "form",
-    icon: Calendar,
-    isContainer: false,
-  },
-  SelectField: {
-    label: "セレクト選択 (SelectField)",
-    shortLabel: "選択欄",
-    category: "form",
-    icon: ListChecks,
-    isContainer: false,
-  },
-  Button: {
-    label: "アクションボタン (Button)",
-    shortLabel: "ボタン",
-    category: "form",
-    icon: MousePointerClick,
-    isContainer: false,
-  },
-  CategoryBreakdown: {
-    label: "カテゴリ別内訳 (CategoryBreakdown)",
-    shortLabel: "カテゴリ内訳",
-    category: "expense",
-    icon: PieChart,
-    isContainer: false,
-  },
-  ExpenseList: {
-    label: "支出リスト (ExpenseList)",
-    shortLabel: "支出リスト",
-    category: "expense",
-    icon: LayoutList,
-    isContainer: false,
-  },
+  Column: { label: "縦並び", icon: Rows3 },
+  Row: { label: "横並び", icon: Columns2 },
+  Grid: { label: "グリッド", icon: LayoutGrid },
+  Card: { label: "カード", icon: SquareStack },
+  Divider: { label: "区切り線", icon: Minus },
+  Text: { label: "テキスト", icon: Type },
+  Badge: { label: "バッジ", icon: Tag },
+  MetricCard: { label: "KPI", icon: CreditCard },
+  ProgressBar: { label: "進捗バー", icon: Gauge },
+  KeyValueList: { label: "項目リスト", icon: ListChecks },
+  Alert: { label: "お知らせ", icon: AlertTriangle },
+  FilterChips: { label: "カテゴリ絞り込み", icon: Filter },
+  TextField: { label: "文字入力", icon: FormInput },
+  NumberField: { label: "数値入力", icon: Hash },
+  DateField: { label: "日付入力", icon: Calendar },
+  SelectField: { label: "選択欄", icon: ListChecks },
+  Button: { label: "ボタン", icon: MousePointerClick },
+  CategoryBreakdown: { label: "カテゴリ別内訳", icon: PieChart },
+  ExpenseList: { label: "支出リスト", icon: LayoutList },
 };
 
 export interface DataBindingOption {
@@ -177,100 +64,163 @@ export interface DataBindingOption {
 }
 
 export const STRING_BINDING_OPTIONS: DataBindingOption[] = [
-  { path: "/summary/totalFormatted", label: "支出合計（¥表記）", group: "集計サマリー" },
-  { path: "/summary/countFormatted", label: "記録件数（〇件）", group: "集計サマリー" },
-  {
-    path: "/summary/averageFormatted",
-    label: "1回あたり平均（平均 ¥〇 / 回）",
-    group: "集計サマリー",
-  },
+  { path: "/summary/totalFormatted", label: "支出合計", group: "集計サマリー" },
+  { path: "/summary/countFormatted", label: "記録件数", group: "集計サマリー" },
+  { path: "/summary/averageFormatted", label: "1回あたりの平均", group: "集計サマリー" },
   { path: "/summary/topCategory", label: "最多カテゴリ名", group: "集計サマリー" },
-  { path: "/summary/topCategoryLabel", label: "最多カテゴリ（最多：〇）", group: "集計サマリー" },
+  { path: "/summary/topCategoryLabel", label: "最多カテゴリラベル", group: "集計サマリー" },
   { path: "/summary/periodLabel", label: "集計期間ラベル", group: "集計サマリー" },
-  { path: "/budget/remainingFormatted", label: "予算残高（¥表記）", group: "月間予算" },
+  { path: "/budget/remainingFormatted", label: "予算残高", group: "月間予算" },
   { path: "/budget/limitLabel", label: "月間予算ラベル", group: "月間予算" },
-  { path: "/budget/detailLabel", label: "予算消化詳細（¥〇 / ¥〇 (%)）", group: "月間予算" },
-  { path: "/budget/statusBadge", label: "予算ステータス（残り〇% / 超過）", group: "月間予算" },
+  { path: "/budget/detailLabel", label: "予算消化の内訳", group: "月間予算" },
+  { path: "/budget/statusBadge", label: "予算ステータス", group: "月間予算" },
 ];
 
 export const NUMBER_BINDING_OPTIONS: DataBindingOption[] = [
-  { path: "/budget/spent", label: "今月の支出合計（数値）", group: "月間予算" },
-  { path: "/budget/limit", label: "月間予算上限（数値）", group: "月間予算" },
-  { path: "/summary/total", label: "全期間の支出合計（数値）", group: "集計サマリー" },
-  { path: "/summary/count", label: "記録件数（数値）", group: "集計サマリー" },
-  { path: "/summary/average", label: "平均支出額（数値）", group: "集計サマリー" },
+  { path: "/budget/spent", label: "今月の支出額", group: "月間予算" },
+  { path: "/budget/limit", label: "月間予算の上限", group: "月間予算" },
+  { path: "/summary/total", label: "全期間の支出合計", group: "集計サマリー" },
+  { path: "/summary/count", label: "記録件数", group: "集計サマリー" },
+  { path: "/summary/average", label: "平均支出額", group: "集計サマリー" },
 ];
 
 export const FORM_FIELD_BIND_OPTIONS: DataBindingOption[] = [
-  { path: "/form/title", label: "支出の内容 (/form/title)", group: "記録フォーム" },
-  { path: "/form/amount", label: "金額 (/form/amount)", group: "記録フォーム" },
-  { path: "/form/category", label: "カテゴリ (/form/category)", group: "記録フォーム" },
-  { path: "/form/spentAt", label: "日付 (/form/spentAt)", group: "記録フォーム" },
-  { path: "/form/note", label: "メモ (/form/note)", group: "記録フォーム" },
-  { path: "/filter/category", label: "絞り込みカテゴリ (/filter/category)", group: "フィルタ" },
+  { path: "/form/title", label: "支出の内容", group: "記録フォーム" },
+  { path: "/form/amount", label: "金額", group: "記録フォーム" },
+  { path: "/form/category", label: "カテゴリ", group: "記録フォーム" },
+  { path: "/form/spentAt", label: "日付", group: "記録フォーム" },
+  { path: "/form/note", label: "メモ", group: "記録フォーム" },
+  { path: "/filter/category", label: "絞り込みカテゴリ", group: "フィルタ" },
 ];
 
-export function summarizeComponent(node: A2UIComponent, dataModel?: DataModel): string {
+interface ComponentDisplayParts {
+  primary: string;
+  secondary?: string;
+}
+
+function displayName(
+  label: string,
+  title: string | undefined,
+  fallback = label,
+): ComponentDisplayParts {
+  return title?.trim() ? { primary: title, secondary: label } : { primary: fallback };
+}
+
+function resolveDisplayText(dataModel: DataModel, value: BoundValue<string> | undefined) {
+  const resolved = resolveValue(dataModel, value);
+  return typeof resolved === "string" ? resolved : undefined;
+}
+
+export function getComponentDisplayParts(
+  node: A2UIComponent,
+  dataModel: DataModel,
+): ComponentDisplayParts {
+  const { label } = COMPONENT_META[node.component];
+
   switch (node.component) {
-    case "Column":
-      return `${node.children.length}要素・余白 ${node.gap ?? "md"}`;
-    case "Row":
-      return `${node.children.length}要素・横並び`;
     case "Grid":
-      return `${node.columns ?? 2}カラム・${node.children.length}要素`;
-    case "Card": {
-      const title = dataModel ? resolveValue(dataModel, node.title) : undefined;
-      const fallback = typeof node.title === "string" ? node.title : title;
-      return fallback ? `${fallback}` : `タイトルなし (${node.children.length}要素)`;
-    }
-    case "Divider":
-      return "水平セパレーター";
-    case "Text": {
-      const text = dataModel ? resolveValue(dataModel, node.text) : undefined;
-      const raw = typeof node.text === "string" ? node.text : text;
-      return raw ? `${raw}` : (node.variant ?? "body");
-    }
-    case "Badge": {
-      const text = dataModel ? resolveValue(dataModel, node.text) : undefined;
-      return (typeof node.text === "string" ? node.text : text) || "バッジ";
+      return { primary: `${node.columns ?? 2}カラム`, secondary: label };
+    case "Card":
+      return displayName(label, resolveDisplayText(dataModel, node.title)?.trim());
+    case "Text":
+    case "Badge":
+      return displayName(label, resolveDisplayText(dataModel, node.text)?.trim());
+    case "Alert": {
+      const title = resolveDisplayText(dataModel, node.title);
+      const text = resolveDisplayText(dataModel, node.text);
+      return displayName(label, (title || text)?.trim());
     }
     case "MetricCard":
-      return node.label || "KPIカード";
+      return displayName(label, node.label, "KPIカード");
     case "ProgressBar":
-      return node.label || "進捗バー";
-    case "KeyValueList":
-      return `${node.items.length}項目`;
-    case "Alert": {
-      const title = dataModel ? resolveValue(dataModel, node.title) : undefined;
-      const text = dataModel ? resolveValue(dataModel, node.text) : undefined;
-      return (typeof node.title === "string" ? node.title : title) || text || "お知らせ";
-    }
-    case "FilterChips":
-      return `${node.options.length}カテゴリ`;
     case "TextField":
     case "NumberField":
     case "DateField":
     case "SelectField":
-      return `${node.label}`;
     case "Button":
-      return `${node.label}`;
-    case "CategoryBreakdown":
-      return "カテゴリ構成比";
+      return displayName(label, node.label);
+    case "KeyValueList":
+      return { primary: label, secondary: `${node.items.length}行` };
     case "ExpenseList":
-      return node.limit ? `最大${node.limit}件` : "全件表示";
+      return { primary: label, secondary: node.limit ? `最大${node.limit}件` : undefined };
+    default:
+      return { primary: label };
   }
 }
 
-export interface PaletteBlueprintEntry extends BlockBlueprint {
+interface ContainerOptionItem {
+  id: string;
+  label: string;
+  typeLabel?: string;
+  depth: number;
+}
+
+export function listContainerOptions(
+  graph: EditableSurfaceGraph,
+  dataModel: DataModel,
+): ContainerOptionItem[] {
+  const result: ContainerOptionItem[] = [];
+  const visited = new Set<string>();
+
+  const summarizeChildNames = (childIds: string[]): string | undefined => {
+    const names: string[] = [];
+    for (const childId of childIds) {
+      const child = graph.componentsById.get(childId);
+      if (!child) continue;
+      const parts = getComponentDisplayParts(child, dataModel);
+      const cleaned = parts.primary.replace(/（任意）$/, "");
+      if (cleaned) names.push(cleaned);
+      if (names.length >= 2) break;
+    }
+    if (names.length === 0) return undefined;
+    return childIds.length > names.length ? `${names.join("・")} ほか` : names.join("・");
+  };
+
+  const visit = (id: string, depth: number) => {
+    if (visited.has(id)) return;
+    visited.add(id);
+    const node = graph.componentsById.get(id);
+    if (!node || !isContainerComponent(node)) return;
+
+    if (id === graph.rootId) {
+      result.push({ id, label: "ページ全体", depth });
+    } else if (node.component === "Column" || node.component === "Row") {
+      const base = COMPONENT_META[node.component].label;
+      const preview = summarizeChildNames(node.children);
+      result.push({
+        id,
+        label: preview ? `${base}（${preview}）` : base,
+        depth,
+      });
+    } else {
+      const parts = getComponentDisplayParts(node, dataModel);
+      result.push({
+        id,
+        label: parts.primary,
+        typeLabel: parts.secondary,
+        depth,
+      });
+    }
+
+    for (const childId of node.children) {
+      visit(childId, depth + 1);
+    }
+  };
+
+  visit(graph.rootId, 0);
+  return result;
+}
+
+interface PaletteBlueprintEntry extends BlockBlueprint {
   icon: LucideIcon;
 }
 
 export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
-  // --- Smart Preset Blocks (複合ブロック) ---
+  // --- Pre-assembled Sets ---
   {
     id: "preset-kpi-trio",
-    label: "3連 KPI サマリー行",
-    description: "支出合計・予算残高・最多カテゴリが並ぶ定番の3カラムKPIセット",
+    label: "3連 KPI サマリー",
+    description: "支出合計・予算残高・最多カテゴリが並ぶ3カラム構成",
     category: "preset",
     icon: Activity,
     keywords: ["kpi", "summary", "metric", "合計", "予算", "サマリー"],
@@ -308,8 +258,8 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
   },
   {
     id: "preset-budget-card",
-    label: "月間予算トラッカーカード",
-    description: "今月の予算消化率をプログレスバーでひと目で確認できるカード",
+    label: "月間予算トラッカー",
+    description: "今月の予算消化率を進捗バー付きカードで表示",
     category: "preset",
     icon: Gauge,
     keywords: ["budget", "progress", "予算", "ゲージ", "トラッカー"],
@@ -332,8 +282,8 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
   },
   {
     id: "preset-quick-expense-form",
-    label: "クイック支出入力カード",
-    description: "内容・金額・カテゴリだけを素早く入力して登録できるコンパクトなフォーム",
+    label: "クイック支出入力",
+    description: "内容・金額・カテゴリを横並びで素早く記録できるカード",
     category: "preset",
     icon: FormInput,
     keywords: ["form", "input", "quick", "入力", "フォーム", "記録"],
@@ -385,8 +335,8 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
   },
   {
     id: "preset-full-expense-form",
-    label: "詳細支出入力フォームカード",
-    description: "日付やメモも含めてしっかり記録できるフル項目フォーム",
+    label: "詳細支出入力フォーム",
+    description: "日付やメモも含めて記録できるカード",
     category: "preset",
     icon: SquareStack,
     keywords: ["form", "full", "date", "note", "詳細", "フォーム", "記録"],
@@ -444,7 +394,7 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
         component: "TextField",
         label: "メモ（任意）",
         bindPath: "/form/note",
-        placeholder: "お店の名前など",
+        placeholder: "例：お店の名前",
       },
       {
         id: "submit-btn",
@@ -456,30 +406,9 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
     ],
   },
   {
-    id: "preset-category-card",
-    label: "カテゴリ別内訳カード",
-    description: "どのカテゴリにいくら使っているかを割合バー付きで表示する分析カード",
-    category: "preset",
-    icon: PieChart,
-    keywords: ["category", "breakdown", "chart", "カテゴリ", "内訳", "分析"],
-    buildNodes: () => [
-      {
-        id: "breakdown-card",
-        component: "Card",
-        title: "カテゴリ別内訳",
-        children: ["category-breakdown"],
-      },
-      {
-        id: "category-breakdown",
-        component: "CategoryBreakdown",
-        dataPath: "/categories",
-      },
-    ],
-  },
-  {
     id: "preset-filterable-expenses",
-    label: "フィルタ付き支出ログカード",
-    description: "カテゴリチップで絞り込み＆個別削除ができる支出一覧カード",
+    label: "絞り込み付き支出ログ",
+    description: "カテゴリ絞り込みと削除ボタン付きの支出一覧カード",
     category: "preset",
     icon: LayoutList,
     keywords: ["list", "history", "filter", "一覧", "ログ", "明細"],
@@ -513,7 +442,7 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
   {
     id: "preset-ai-shortcut-card",
     label: "AI アシスタント相談バー",
-    description: "ワンクリックでAIに今月の振り返りや節約アドバイスを聞けるショートカット",
+    description: "ワンクリックでAIに振り返りや節約相談を送れるカード",
     category: "preset",
     icon: Sparkles,
     keywords: ["ai", "assistant", "prompt", "相談", "分析", "アドバイス"],
@@ -554,11 +483,11 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
     ],
   },
 
-  // --- Layout Primitives ---
+  // --- Layout Blocks ---
   {
     id: "layout-grid-2",
-    label: "2カラム グリッド (Grid)",
-    description: "左右2列にカードやパーツを並べるレイアウト枠",
+    label: "2カラム グリッド",
+    description: "左右2列にブロックを並べるレイアウト枠",
     category: "layout",
     icon: LayoutGrid,
     keywords: ["grid", "2", "columns", "2カラム", "2列", "グリッド"],
@@ -574,8 +503,8 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
   },
   {
     id: "layout-grid-3",
-    label: "3カラム グリッド (Grid)",
-    description: "KPIカードなどを3列に並べるレイアウト枠",
+    label: "3カラム グリッド",
+    description: "3列にブロックを並べるレイアウト枠",
     category: "layout",
     icon: LayoutGrid,
     keywords: ["grid", "3", "columns", "3カラム", "3列", "グリッド"],
@@ -591,24 +520,24 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
   },
   {
     id: "layout-card",
-    label: "空のカード枠 (Card)",
-    description: "タイトル付きのカードコンテナ（中に自由なパーツを追加可能）",
+    label: "カード",
+    description: "中にブロックを入れられる見出し付きの枠",
     category: "layout",
     icon: SquareStack,
-    keywords: ["card", "box", "section", "カード", "枠"],
+    keywords: ["card", "box", "カード", "枠"],
     buildNodes: () => [
       {
         id: "custom-card",
         component: "Card",
-        title: "新しいセクション",
+        title: "見出し",
         children: [],
       },
     ],
   },
   {
     id: "layout-row",
-    label: "横並びグループ (Row)",
-    description: "入力欄やボタンを横に並べるコンテナ",
+    label: "横並び",
+    description: "ブロックを横方向に並べる枠",
     category: "layout",
     icon: Columns2,
     keywords: ["row", "horizontal", "flex", "横並び"],
@@ -624,8 +553,8 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
   },
   {
     id: "layout-column",
-    label: "縦並びグループ (Column)",
-    description: "複数のカードや要素を縦に積むコンテナ",
+    label: "縦並び",
+    description: "ブロックを縦方向に積む枠",
     category: "layout",
     icon: Rows3,
     keywords: ["column", "vertical", "stack", "縦並び"],
@@ -640,8 +569,8 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
   },
   {
     id: "layout-divider",
-    label: "区切り線 (Divider)",
-    description: "セクション間を視覚的に区切る水平ライン",
+    label: "区切り線",
+    description: "上下のブロックを区切る水平ライン",
     category: "layout",
     icon: Minus,
     keywords: ["divider", "separator", "hr", "区切り線"],
@@ -653,11 +582,11 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
     ],
   },
 
-  // --- Display Primitives ---
+  // --- Display Blocks ---
   {
     id: "display-metric",
-    label: "単体 KPI カード (MetricCard)",
-    description: "合計金額・件数・平均値などの指標を1枚表示するカード",
+    label: "KPIカード",
+    description: "合計金額・件数・平均値などの指標を1枚表示",
     category: "display",
     icon: CreditCard,
     keywords: ["metric", "kpi", "stat", "数値", "指標"],
@@ -665,7 +594,7 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
       {
         id: "metric-card",
         component: "MetricCard",
-        label: "合計支出",
+        label: "支出合計",
         value: { "@path": "/summary/totalFormatted" },
         helper: { "@path": "/summary/periodLabel" },
       },
@@ -673,8 +602,8 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
   },
   {
     id: "display-progress",
-    label: "進捗バー (ProgressBar)",
-    description: "目標や上限に対する達成率・消化率を表示するバー",
+    label: "進捗バー",
+    description: "上限に対する消化率や達成率を表示",
     category: "display",
     icon: Gauge,
     keywords: ["progress", "bar", "進捗", "バー"],
@@ -690,9 +619,43 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
     ],
   },
   {
+    id: "display-category-breakdown",
+    label: "カテゴリ別内訳",
+    description: "カテゴリごとの支出額と割合バーを表示",
+    category: "display",
+    icon: PieChart,
+    keywords: ["category", "breakdown", "chart", "カテゴリ", "内訳", "分析"],
+    buildNodes: () => [
+      {
+        id: "category-breakdown",
+        component: "CategoryBreakdown",
+        dataPath: "/categories",
+      },
+    ],
+  },
+  {
+    id: "display-expense-list",
+    label: "支出リスト",
+    description: "登録済みの支出明細を一覧表示",
+    category: "display",
+    icon: LayoutList,
+    keywords: ["expense", "list", "明細", "リスト"],
+    buildNodes: () => [
+      {
+        id: "expense-list",
+        component: "ExpenseList",
+        dataPath: "/expenses",
+        showCategory: true,
+        showDate: true,
+        allowDelete: true,
+        limit: 8,
+      },
+    ],
+  },
+  {
     id: "display-kv-list",
-    label: "項目・値リスト (KeyValueList)",
-    description: "ラベルと数値をすっきり縦に並べるサマリー表",
+    label: "項目リスト",
+    description: "ラベルと値を縦に並べる集計表",
     category: "display",
     icon: ListChecks,
     keywords: ["key", "value", "table", "summary", "項目", "リスト"],
@@ -713,43 +676,9 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
     ],
   },
   {
-    id: "display-category-breakdown",
-    label: "カテゴリ別内訳単体 (CategoryBreakdown)",
-    description: "カード内の好きな場所に配置できるカテゴリ構成比ウィジェット",
-    category: "display",
-    icon: PieChart,
-    keywords: ["category", "breakdown", "内訳"],
-    buildNodes: () => [
-      {
-        id: "category-breakdown",
-        component: "CategoryBreakdown",
-        dataPath: "/categories",
-      },
-    ],
-  },
-  {
-    id: "display-expense-list",
-    label: "支出リスト単体 (ExpenseList)",
-    description: "カード内に配置できる支出明細リスト",
-    category: "display",
-    icon: LayoutList,
-    keywords: ["expense", "list", "明細", "リスト"],
-    buildNodes: () => [
-      {
-        id: "expense-list",
-        component: "ExpenseList",
-        dataPath: "/expenses",
-        showCategory: true,
-        showDate: true,
-        allowDelete: true,
-        limit: 8,
-      },
-    ],
-  },
-  {
     id: "display-alert",
-    label: "お知らせ・メモバナー (Alert)",
-    description: "家計のルールや注意事項を目立たせて表示するアラート",
+    label: "お知らせ",
+    description: "マイルールやメモを目立たせて表示",
     category: "display",
     icon: AlertTriangle,
     keywords: ["alert", "banner", "notice", "お知らせ", "注意", "メモ"],
@@ -765,8 +694,8 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
   },
   {
     id: "display-text",
-    label: "見出し・テキスト (Text)",
-    description: "セクション見出しや補足説明テキストを追加",
+    label: "見出し・テキスト",
+    description: "見出しや補足文を表示",
     category: "display",
     icon: Type,
     keywords: ["text", "heading", "title", "テキスト", "見出し"],
@@ -775,14 +704,14 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
         id: "heading-text",
         component: "Text",
         variant: "h2",
-        text: "セクション見出し",
+        text: "見出し",
       },
     ],
   },
   {
     id: "display-badge",
-    label: "ステータスバッジ (Badge)",
-    description: "データ連動または固定ラベルの小さなバッジ",
+    label: "バッジ",
+    description: "データ連携または固定文字の小さなラベル",
     category: "display",
     icon: Tag,
     keywords: ["badge", "tag", "status", "バッジ"],
@@ -796,11 +725,11 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
     ],
   },
 
-  // --- Form Primitives ---
+  // --- Form & Action Blocks ---
   {
     id: "form-filter-chips",
-    label: "カテゴリ絞り込みチップ (FilterChips)",
-    description: "支出リストと連動するカテゴリ切り替えボタン群",
+    label: "カテゴリ絞り込み",
+    description: "支出リストの表示カテゴリを切り替えるボタン群",
     category: "form",
     icon: Filter,
     keywords: ["filter", "chips", "category", "絞り込み", "フィルタ"],
@@ -816,8 +745,8 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
   },
   {
     id: "form-text-field",
-    label: "テキスト入力欄 (TextField)",
-    description: "内容やメモを入力するテキストフィールド",
+    label: "テキスト入力",
+    description: "内容やメモを入力する欄",
     category: "form",
     icon: FormInput,
     keywords: ["text", "input", "field", "入力"],
@@ -834,8 +763,8 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
   },
   {
     id: "form-number-field",
-    label: "金額・数値入力欄 (NumberField)",
-    description: "単位サフィックス付きの数値入力フィールド",
+    label: "数値入力",
+    description: "金額などの数値を入力する欄",
     category: "form",
     icon: Hash,
     keywords: ["number", "amount", "yen", "金額", "数値"],
@@ -853,8 +782,8 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
   },
   {
     id: "form-select-field",
-    label: "セレクト選択欄 (SelectField)",
-    description: "カテゴリなどをドロップダウンから選ぶフィールド",
+    label: "セレクト選択",
+    description: "ドロップダウンからカテゴリ等を選ぶ欄",
     category: "form",
     icon: ListChecks,
     keywords: ["select", "dropdown", "category", "選択", "カテゴリ"],
@@ -870,8 +799,8 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
   },
   {
     id: "form-date-field",
-    label: "日付入力欄 (DateField)",
-    description: "支出日を選択するカレンダー入力フィールド",
+    label: "日付入力",
+    description: "カレンダーから日付を選ぶ欄",
     category: "form",
     icon: Calendar,
     keywords: ["date", "calendar", "日付"],
@@ -886,8 +815,8 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
   },
   {
     id: "form-action-button",
-    label: "アクションボタン (Button)",
-    description: "支出の登録またはAIへの質問を実行するボタン",
+    label: "ボタン",
+    description: "支出の登録やAIへの質問を実行するボタン",
     category: "form",
     icon: MousePointerClick,
     keywords: ["button", "submit", "action", "ボタン", "送信"],

@@ -18,8 +18,9 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ArrowDown, ArrowUp, Copy, GripVertical, Plus, Trash2 } from "lucide-react";
-import { COMPONENT_META, summarizeComponent } from "@/features/dashboard/lib/catalog-registry";
+import { Button } from "@/components/ui/button";
 import { isContainerComponent } from "@/features/dashboard/lib/a2ui-builder";
+import { getComponentDisplayParts } from "@/features/dashboard/lib/catalog-registry";
 import { cn } from "@/lib/utils";
 import type { DataModel } from "../data-model";
 import type { A2UIComponent } from "../types";
@@ -106,24 +107,25 @@ export function A2UIEditableSurfaceRoot({
       onDragCancel={() => setActiveDragId(null)}
     >
       <div
-        className="space-y-3"
+        className="space-y-4"
         onClick={() => {
           editor.onSelect(null);
         }}
       >
         {children}
 
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={(e) => {
             e.stopPropagation();
             editor.onRequestAdd(rootId);
           }}
-          className="border-primary/35 text-muted-foreground hover:border-primary hover:bg-primary/5 hover:text-primary flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-dashed py-3 text-xs font-medium transition-colors"
+          className="text-muted-foreground hover:text-foreground h-11 w-full border-dashed"
         >
-          <Plus className="size-3.5" />
-          セクション・パーツを末尾に追加
-        </button>
+          <Plus className="size-4" />
+          ブロックを追加
+        </Button>
       </div>
     </DndContext>
   );
@@ -149,7 +151,6 @@ export function SortableCanvasContainer({
       {containerNode.children.length === 0 ? (
         <EmptyContainerDropzone
           containerId={containerNode.id}
-          label={COMPONENT_META[containerNode.component].shortLabel}
           onRequestAdd={() => editor.onRequestAdd(containerNode.id)}
         />
       ) : (
@@ -161,11 +162,9 @@ export function SortableCanvasContainer({
 
 function EmptyContainerDropzone({
   containerId,
-  label,
   onRequestAdd,
 }: {
   containerId: string;
-  label: string;
   onRequestAdd: () => void;
 }) {
   const { isOver, setNodeRef } = useDroppable({
@@ -173,23 +172,23 @@ function EmptyContainerDropzone({
   });
 
   return (
-    <button
-      ref={setNodeRef}
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        onRequestAdd();
-      }}
-      className={cn(
-        "col-span-full flex min-h-20 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-dashed px-3 py-4 text-xs font-medium transition-colors",
-        isOver
-          ? "border-primary bg-primary/10 text-primary"
-          : "border-border text-muted-foreground hover:border-primary/50 hover:bg-muted/60 hover:text-foreground",
-      )}
-    >
-      <Plus className="size-3.5" />
-      <span>{label} 内にパーツを追加（またはここにドロップ）</span>
-    </button>
+    <div ref={setNodeRef} className="col-span-full">
+      <Button
+        type="button"
+        variant="outline"
+        onClick={(e) => {
+          e.stopPropagation();
+          onRequestAdd();
+        }}
+        className={cn(
+          "min-h-20 w-full border-dashed",
+          isOver ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground",
+        )}
+      >
+        <Plus className="size-4" />
+        ブロックを追加
+      </Button>
+    </div>
   );
 }
 
@@ -228,9 +227,7 @@ export function SortableCanvasItem({
   });
 
   const isSelected = editor.selectedId === node.id;
-  const meta = COMPONENT_META[node.component];
-  const Icon = meta.icon;
-  const summary = summarizeComponent(node, dataModel);
+  const display = getComponentDisplayParts(node, dataModel);
 
   const siblingIndex =
     parent && isContainerComponent(parent) ? parent.children.indexOf(node.id) : -1;
@@ -258,13 +255,13 @@ export function SortableCanvasItem({
           : "hover:ring-primary/40 hover:ring-1 hover:ring-offset-1",
       )}
     >
-      {/* Floating chrome pill: always visible when selected, subtle on hover */}
+      {/* Floating block chip: border matches selection ring, whole label area acts as drag grip */}
       <div
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          "bg-background/95 text-foreground absolute -top-3 left-2 z-20 flex max-w-[calc(100%-1rem)] items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[11px] shadow-xs backdrop-blur-xs transition-opacity",
+          "bg-background/95 text-foreground absolute -top-4 left-2.5 z-20 flex h-8 max-w-[calc(100%-1.25rem)] items-center rounded-lg border px-1 shadow-sm backdrop-blur-xs transition-opacity",
           isSelected
-            ? "border-primary/50 opacity-100"
+            ? "border-primary opacity-100"
             : "pointer-events-none opacity-0 group-hover/a2ui-node:pointer-events-auto group-hover/a2ui-node:opacity-100",
         )}
       >
@@ -272,76 +269,80 @@ export function SortableCanvasItem({
           type="button"
           {...attributes}
           {...listeners}
-          aria-label={`${meta.shortLabel} をドラッグして移動`}
-          title="ドラッグして並び替え"
-          className="text-muted-foreground hover:text-foreground flex cursor-grab items-center rounded-xs p-0.5 active:cursor-grabbing"
-        >
-          <GripVertical className="size-3" />
-        </button>
-
-        <button
-          type="button"
           onClick={() => editor.onSelect(node.id)}
-          className="flex min-w-0 cursor-pointer items-center gap-1 px-1 font-medium"
+          aria-label={`${display.primary}を選択・移動`}
+          className="group/chip-handle flex h-full min-w-0 cursor-grab items-center gap-1.5 pr-2 pl-0.5 text-xs select-none active:cursor-grabbing"
         >
-          <Icon className="text-primary size-3 shrink-0" />
-          <span className="shrink-0">{meta.shortLabel}</span>
-          {summary && (
-            <span className="text-muted-foreground max-w-28 truncate font-normal">· {summary}</span>
+          <span className="text-muted-foreground group-hover/chip-handle:bg-accent group-hover/chip-handle:text-accent-foreground flex size-6 shrink-0 items-center justify-center rounded-md transition-colors">
+            <GripVertical className="size-4" />
+          </span>
+          <span className="text-foreground max-w-44 truncate font-medium">{display.primary}</span>
+          {display.secondary && (
+            <span className="text-muted-foreground shrink-0">{display.secondary}</span>
           )}
         </button>
 
         {isSelected && (
-          <div className="ml-0.5 flex items-center gap-0.5 border-l pl-1">
-            {meta.isContainer && (
-              <button
+          <div className="flex items-center gap-0.5 border-l pl-1">
+            {isContainerComponent(node) && (
+              <Button
                 type="button"
-                title="この中にパーツを追加"
-                aria-label="この中にパーツを追加"
+                variant="ghost"
+                size="icon"
+                className="text-primary hover:text-primary size-7"
+                title="ブロックを追加"
+                aria-label="ブロックを追加"
                 onClick={() => editor.onRequestAdd(node.id)}
-                className="text-primary hover:bg-primary/10 cursor-pointer rounded-xs p-0.5"
               >
-                <Plus className="size-3" />
-              </button>
+                <Plus className="size-3.5" />
+              </Button>
             )}
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
+              className="size-7"
               disabled={!canMoveUp}
               title="前へ移動"
               aria-label="前へ移動"
               onClick={() => editor.onMoveRelative(node.id, "up")}
-              className="text-muted-foreground hover:text-foreground hover:bg-accent cursor-pointer rounded-xs p-0.5 disabled:pointer-events-none disabled:opacity-30"
             >
-              <ArrowUp className="size-3" />
-            </button>
-            <button
+              <ArrowUp className="size-3.5" />
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
+              className="size-7"
               disabled={!canMoveDown}
               title="次へ移動"
               aria-label="次へ移動"
               onClick={() => editor.onMoveRelative(node.id, "down")}
-              className="text-muted-foreground hover:text-foreground hover:bg-accent cursor-pointer rounded-xs p-0.5 disabled:pointer-events-none disabled:opacity-30"
             >
-              <ArrowDown className="size-3" />
-            </button>
-            <button
+              <ArrowDown className="size-3.5" />
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
+              className="size-7"
               title="複製"
               aria-label="複製"
               onClick={() => editor.onDuplicate(node.id)}
-              className="text-muted-foreground hover:text-foreground hover:bg-accent cursor-pointer rounded-xs p-0.5"
             >
-              <Copy className="size-3" />
-            </button>
-            <button
+              <Copy className="size-3.5" />
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-destructive size-7"
               title="削除"
               aria-label="削除"
               onClick={() => editor.onDelete(node.id)}
-              className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer rounded-xs p-0.5"
             >
-              <Trash2 className="size-3" />
-            </button>
+              <Trash2 className="size-3.5" />
+            </Button>
           </div>
         )}
       </div>

@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -73,12 +72,9 @@ export function SaveVersionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent aria-describedby={undefined} className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-base">カスタマイズを新バージョンとして保存</DialogTitle>
-          <DialogDescription className="text-xs">
-            保存すると新しいUIバージョンとして履歴に追加され、すぐにダッシュボードへ適用されます。
-          </DialogDescription>
+          <DialogTitle className="text-base">新バージョンとして保存</DialogTitle>
         </DialogHeader>
 
         <form
@@ -120,7 +116,7 @@ export function SaveVersionDialog({
                   value={field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
-                  placeholder="工夫した点やレイアウトの特徴など"
+                  placeholder="例：予算トラッカーを上部に移動"
                   className="text-xs"
                 />
                 <FieldError errors={field.state.meta.errors} />

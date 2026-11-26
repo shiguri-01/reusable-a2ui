@@ -18,9 +18,10 @@ import { CSS } from "@dnd-kit/utilities";
 import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2 } from "lucide-react";
 import type { DataModel } from "@/features/a2ui/data-model";
 import type { A2UIComponent } from "@/features/a2ui/types";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { isContainerComponent, type EditableSurfaceGraph } from "../lib/a2ui-builder";
-import { COMPONENT_META, summarizeComponent } from "../lib/catalog-registry";
+import { COMPONENT_META, getComponentDisplayParts } from "../lib/catalog-registry";
 
 interface StructureOutlineProps {
   graph: EditableSurfaceGraph;
@@ -84,7 +85,7 @@ export function StructureOutline({
   const rootNode = graph.componentsById.get(graph.rootId);
   if (!rootNode || !isContainerComponent(rootNode)) return null;
 
-  const renderSubtree = (nodeId: string, depth: number): ReactNode => {
+  const renderSubtree = (nodeId: string): ReactNode => {
     const node = graph.componentsById.get(nodeId);
     if (!node) return null;
 
@@ -95,7 +96,6 @@ export function StructureOutline({
       <SortableTreeRow
         key={node.id}
         node={node}
-        depth={depth}
         dataModel={dataModel}
         isSelected={selectedId === node.id}
         isCollapsed={isCollapsed}
@@ -106,8 +106,8 @@ export function StructureOutline({
       >
         {container && !isCollapsed && node.children.length > 0 && (
           <SortableContext items={node.children} strategy={verticalListSortingStrategy}>
-            <div className="border-border/70 ml-3.5 space-y-0.5 border-l pl-2 pt-0.5">
-              {node.children.map((childId) => renderSubtree(childId, depth + 1))}
+            <div className="border-border ml-4 space-y-0.5 border-l pl-2 pt-0.5">
+              {node.children.map(renderSubtree)}
             </div>
           </SortableContext>
         )}
@@ -122,41 +122,38 @@ export function StructureOutline({
       collisionDetection={closestCenter}
       onDragEnd={handleDragEnd}
     >
-      <div className="space-y-1">
-        {/* Root row */}
+      <div className="space-y-0.5">
         <div
           onClick={() => onSelect(rootNode.id)}
           className={cn(
-            "flex cursor-pointer items-center justify-between gap-1.5 rounded-lg px-2 py-1.5 text-xs transition-colors",
+            "flex min-h-9 cursor-pointer items-center justify-between gap-1.5 rounded-md px-2 py-1 text-sm transition-colors",
             selectedId === rootNode.id
-              ? "bg-primary/10 text-primary font-semibold"
-              : "hover:bg-muted/70 text-foreground font-medium",
+              ? "bg-accent text-accent-foreground font-medium"
+              : "hover:bg-muted/70 text-foreground",
           )}
         >
-          <span className="truncate">ページ全体 (root · {rootNode.children.length}セクション)</span>
-          <button
+          <span className="truncate font-medium">ページ全体</span>
+          <Button
             type="button"
-            title="セクションを追加"
-            aria-label="セクションを追加"
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            title="ブロックを追加"
+            aria-label="ブロックを追加"
             onClick={(e) => {
               e.stopPropagation();
               onRequestAdd(rootNode.id);
             }}
-            className="text-muted-foreground hover:text-primary hover:bg-primary/10 cursor-pointer rounded-xs p-0.5"
           >
-            <Plus className="size-3.5" />
-          </button>
+            <Plus className="size-4" />
+          </Button>
         </div>
 
         {rootNode.children.length === 0 ? (
-          <div className="text-muted-foreground rounded-lg border border-dashed px-3 py-4 text-center text-xs">
-            まだパーツがありません。「＋ パーツを追加」から作成できます。
-          </div>
+          <p className="text-muted-foreground px-2 py-3 text-sm">まだブロックがありません</p>
         ) : (
           <SortableContext items={rootNode.children} strategy={verticalListSortingStrategy}>
-            <div className="space-y-0.5">
-              {rootNode.children.map((childId) => renderSubtree(childId, 0))}
-            </div>
+            <div className="space-y-0.5">{rootNode.children.map(renderSubtree)}</div>
           </SortableContext>
         )}
       </div>
@@ -166,7 +163,6 @@ export function StructureOutline({
 
 interface SortableTreeRowProps {
   node: A2UIComponent;
-  depth: number;
   dataModel: DataModel;
   isSelected: boolean;
   isCollapsed: boolean;
@@ -192,10 +188,10 @@ function SortableTreeRow({
     id: node.id,
   });
 
-  const meta = COMPONENT_META[node.component];
-  const Icon = meta.icon;
-  const summary = summarizeComponent(node, dataModel);
-  const hasChildren = isContainerComponent(node) && node.children.length > 0;
+  const { icon: Icon } = COMPONENT_META[node.component];
+  const display = getComponentDisplayParts(node, dataModel);
+  const isContainer = isContainerComponent(node);
+  const hasChildren = isContainer && node.children.length > 0;
 
   return (
     <div
@@ -209,53 +205,53 @@ function SortableTreeRow({
       <div
         onClick={onSelect}
         className={cn(
-          "group/tree-row flex cursor-pointer items-center justify-between gap-1 rounded-md px-1.5 py-1 text-xs transition-colors",
+          "group/tree-row flex min-h-9 cursor-pointer items-center justify-between gap-1 rounded-md px-1 py-1 text-sm transition-colors",
           isSelected
-            ? "bg-primary/12 text-primary font-medium"
+            ? "bg-accent text-accent-foreground font-medium"
             : "hover:bg-muted/70 text-foreground",
         )}
       >
-        <div className="flex min-w-0 flex-1 items-center gap-1">
-          <button
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             {...attributes}
             {...listeners}
             onClick={(e) => e.stopPropagation()}
-            aria-label="ドラッグして並び替え"
-            className="text-muted-foreground/70 hover:text-foreground cursor-grab rounded-xs p-0.5 active:cursor-grabbing"
+            aria-label={`${display.primary}を移動`}
+            className="text-muted-foreground hover:text-foreground size-7 shrink-0 cursor-grab active:cursor-grabbing"
           >
-            <GripVertical className="size-3" />
-          </button>
+            <GripVertical className="size-4" />
+          </Button>
 
-          {meta.isContainer ? (
-            <button
+          {isContainer ? (
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
+              disabled={!hasChildren}
               onClick={(e) => {
                 e.stopPropagation();
                 if (hasChildren) onToggleCollapse();
               }}
-              className={cn(
-                "text-muted-foreground flex size-4 shrink-0 items-center justify-center rounded-xs",
-                hasChildren ? "hover:text-foreground cursor-pointer" : "opacity-30",
-              )}
+              className="text-muted-foreground size-6 shrink-0 disabled:opacity-30"
               aria-label={isCollapsed ? "展開" : "折りたたむ"}
             >
               {isCollapsed ? (
-                <ChevronRight className="size-3" />
+                <ChevronRight className="size-4" />
               ) : (
-                <ChevronDown className="size-3" />
+                <ChevronDown className="size-4" />
               )}
-            </button>
+            </Button>
           ) : (
-            <span className="size-4 shrink-0" />
+            <span className="size-6 shrink-0" />
           )}
 
-          <Icon className="text-muted-foreground size-3.5 shrink-0" />
-          <span className="shrink-0">{meta.shortLabel}</span>
-          {summary && (
-            <span className="text-muted-foreground truncate text-[11px] font-normal">
-              · {summary}
-            </span>
+          <Icon className="text-muted-foreground size-4 shrink-0" />
+          <span className="text-foreground truncate font-medium">{display.primary}</span>
+          {display.secondary && (
+            <span className="text-muted-foreground shrink-0 font-normal">{display.secondary}</span>
           )}
         </div>
 
@@ -266,26 +262,30 @@ function SortableTreeRow({
           )}
           onClick={(e) => e.stopPropagation()}
         >
-          {meta.isContainer && (
-            <button
+          {isContainer && (
+            <Button
               type="button"
-              title="この中にパーツを追加"
-              aria-label="この中にパーツを追加"
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              title="ブロックを追加"
+              aria-label="ブロックを追加"
               onClick={onRequestAdd}
-              className="text-muted-foreground hover:text-primary hover:bg-primary/10 cursor-pointer rounded-xs p-0.5"
             >
-              <Plus className="size-3" />
-            </button>
+              <Plus className="size-4" />
+            </Button>
           )}
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-destructive size-7"
             title="削除"
             aria-label="削除"
             onClick={onDelete}
-            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer rounded-xs p-0.5"
           >
-            <Trash2 className="size-3" />
-          </button>
+            <Trash2 className="size-4" />
+          </Button>
         </div>
       </div>
 

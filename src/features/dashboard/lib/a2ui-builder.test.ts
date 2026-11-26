@@ -11,7 +11,7 @@ import {
   removeComponent,
   updateComponent,
 } from "./a2ui-builder";
-import { BLOCK_BLUEPRINTS } from "./catalog-registry";
+import { BLOCK_BLUEPRINTS, getComponentDisplayParts } from "./catalog-registry";
 
 describe("a2ui-builder operations", () => {
   const baseV3 = PRESET_UI_VERSIONS[2]!.messages;
@@ -77,5 +77,15 @@ describe("a2ui-builder operations", () => {
     const graph = extractEditableSurface(updated);
     const grid = graph.componentsById.get("kpi-grid");
     expect(grid?.component === "Grid" ? grid.columns : null).toBe(2);
+  });
+});
+
+it("falls back to the block type when a text binding resolves to a number", () => {
+  const block = { id: "summary", component: "Text", text: { "@path": "/total" } } as const;
+
+  expect(getComponentDisplayParts(block, { total: 1200 })).toEqual({ primary: "テキスト" });
+  expect(getComponentDisplayParts(block, { total: "  ¥1,200  " })).toEqual({
+    primary: "¥1,200",
+    secondary: "テキスト",
   });
 });

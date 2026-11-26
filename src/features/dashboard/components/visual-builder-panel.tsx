@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useShortcut, useShortcutHint } from "@ui-sdk/react/shortcuts";
-import { Layers, MousePointerClick, Plus } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import type { DataModel } from "@/features/a2ui/data-model";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type {
   DashboardBuilderActions,
   DashboardBuilderState,
@@ -14,6 +16,20 @@ interface VisualBuilderPanelProps {
   dataModel: DataModel;
 }
 
+function BuilderSectionTrigger({ label }: { label: string }) {
+  return (
+    <CollapsibleTrigger asChild>
+      <button
+        type="button"
+        className="group bg-sidebar hover:bg-sidebar-accent sticky top-0 z-10 flex w-full cursor-pointer items-center justify-between px-4 py-2.5 text-left text-xs font-semibold transition-colors"
+      >
+        <span>{label}</span>
+        <ChevronDown className="text-muted-foreground size-4 transition-transform group-data-[state=closed]:-rotate-90" />
+      </button>
+    </CollapsibleTrigger>
+  );
+}
+
 function isEditableTextTarget(): boolean {
   if (typeof document === "undefined") return false;
   const el = document.activeElement;
@@ -23,6 +39,8 @@ function isEditableTextTarget(): boolean {
 }
 
 export function VisualBuilderPanel({ builder, dataModel }: VisualBuilderPanelProps) {
+  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [layersOpen, setLayersOpen] = useState(true);
   const addHint = useShortcutHint("mod+k");
 
   useShortcut("mod+k", () => {
@@ -88,70 +106,69 @@ export function VisualBuilderPanel({ builder, dataModel }: VisualBuilderPanelPro
     : undefined;
 
   return (
-    <div className="space-y-4">
-      {/* Primary Add Block CTA */}
-      <Button
-        type="button"
-        variant="default"
-        size="sm"
-        className="w-full justify-between gap-2"
-        onClick={() => builder.openPalette()}
-      >
-        <span className="flex items-center gap-1.5">
-          <Plus className="size-4" />
-          パーツ・複合ブロックを追加
-        </span>
-        <kbd className="bg-primary-foreground/15 text-primary-foreground rounded-xs px-1.5 py-0.5 font-sans text-[10px] font-medium">
-          {addHint.text}
-        </kbd>
-      </Button>
-
-      {/* Selected Component Inspector */}
-      {selectedNode ? (
-        <ComponentInspector
-          key={`${selectedNode.id}:${builder.resetEpoch}`}
-          node={selectedNode}
-          graph={builder.graph}
-          dataModel={dataModel}
-          onSelectNode={builder.setSelectedId}
-          onUpdateNode={builder.updateNode}
-          onMoveToContainer={(nodeId, targetParentId) => builder.moveNode(nodeId, targetParentId)}
-          onMoveRelative={builder.moveNodeRelative}
-          onDuplicate={builder.duplicateNode}
-          onDelete={builder.deleteNode}
-          onRequestAddChild={(parentId) => builder.openPalette(parentId)}
-        />
-      ) : (
-        <div className="bg-muted/35 text-muted-foreground flex items-start gap-2.5 rounded-xl border border-dashed px-3 py-2.5 text-xs">
-          <MousePointerClick className="text-primary mt-0.5 size-4 shrink-0" />
-          <div className="leading-relaxed">
-            左のキャンバスまたは下の構成ツリーからパーツをクリックすると、見出し・データ連携・カラム数などを編集できます。ドラッグで並び替えも可能です。
-          </div>
-        </div>
-      )}
-
-      {/* Hierarchical Layer Outline */}
-      <div className="space-y-1.5">
-        <div className="text-muted-foreground flex items-center justify-between px-0.5 text-[11px] font-semibold">
+    <div className="divide-y">
+      {/* Add Block Button */}
+      <div className="px-4 py-3">
+        <Button
+          type="button"
+          variant="default"
+          size="sm"
+          className="w-full justify-between gap-2"
+          onClick={() => builder.openPalette()}
+        >
           <span className="flex items-center gap-1.5">
-            <Layers className="size-3.5" />
-            レイヤー構成（ドラッグで並び替え）
+            <Plus className="size-4" />
+            ブロックを追加
           </span>
-          <span>{builder.graph.components.length - 1} パーツ</span>
-        </div>
+          <kbd className="bg-primary-foreground/15 text-primary-foreground rounded-xs px-1.5 py-0.5 font-sans text-[10px] font-medium">
+            {addHint.text}
+          </kbd>
+        </Button>
+      </div>
 
-        <div className="bg-card rounded-xl border p-2">
+      {/* Collapsible Section: Selected Block Settings */}
+      <Collapsible open={inspectorOpen} onOpenChange={setInspectorOpen}>
+        <BuilderSectionTrigger label="プロパティ" />
+        <CollapsibleContent className="px-4 pt-1 pb-4">
+          {selectedNode ? (
+            <ComponentInspector
+              key={`${selectedNode.id}:${builder.resetEpoch}`}
+              node={selectedNode}
+              graph={builder.graph}
+              dataModel={dataModel}
+              onSelectNode={builder.setSelectedId}
+              onUpdateNode={builder.updateNode}
+              onMoveRelative={builder.moveNodeRelative}
+              onDuplicate={builder.duplicateNode}
+              onDelete={builder.deleteNode}
+              onRequestAddChild={(parentId) => builder.openPalette(parentId)}
+            />
+          ) : (
+            <p className="text-muted-foreground py-1 text-sm">
+              ブロックを選択すると設定を編集できます
+            </p>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Collapsible Section: Layer Outline */}
+      <Collapsible open={layersOpen} onOpenChange={setLayersOpen}>
+        <BuilderSectionTrigger label="レイヤー" />
+        <CollapsibleContent className="px-2.5 pt-0.5 pb-4">
           <StructureOutline
             graph={builder.graph}
             dataModel={dataModel}
             selectedId={builder.selectedId}
-            onSelect={(id) => builder.setSelectedId(id)}
+            onSelect={(id) => {
+              builder.setSelectedId(id);
+              setInspectorOpen(true);
+            }}
             onMove={builder.moveNode}
             onDelete={builder.deleteNode}
             onRequestAdd={(parentId) => builder.openPalette(parentId)}
           />
-        </div>
-      </div>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }

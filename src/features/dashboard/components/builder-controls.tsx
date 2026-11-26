@@ -1,6 +1,4 @@
-import type { ReactNode } from "react";
-import { SegmentedControl, SegmentedControlItem } from "@ui-sdk/react/segmented-control";
-import { Switch, SwitchThumb } from "@ui-sdk/react/switch";
+import { useId, type ReactNode } from "react";
 import { getByPath, type DataModel } from "@/features/a2ui/data-model";
 import type { BoundValue } from "@/features/a2ui/types";
 import { Input } from "@/components/ui/input";
@@ -14,6 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import {
   NUMBER_BINDING_OPTIONS,
@@ -21,7 +21,7 @@ import {
   type DataBindingOption,
 } from "../lib/catalog-registry";
 
-export interface SegmentedOption<T extends string = string> {
+interface SegmentedOption<T extends string> {
   value: T;
   label: ReactNode;
   title?: string;
@@ -45,80 +45,53 @@ export function BuilderSegmentedControl<T extends string = string>({
   size = "sm",
 }: BuilderSegmentedControlProps<T>) {
   return (
-    <SegmentedControl
+    <ToggleGroup
+      type="single"
       value={value}
       aria-label={ariaLabel}
       onValueChange={(next) => {
-        if (next !== null) {
-          onChange(next as T);
-        }
+        if (!next) return;
+        const option = options.find(({ value }) => value === next);
+        if (option) onChange(option.value);
       }}
       className={cn(
-        "bg-muted/80 inline-grid w-full auto-cols-fr grid-flow-col items-center gap-0.5 rounded-lg border p-0.5",
+        "bg-muted inline-grid w-full auto-cols-fr grid-flow-col gap-0.5 rounded-lg p-0.5",
         className,
       )}
     >
       {options.map((opt) => (
-        <SegmentedControlItem
+        <ToggleGroupItem
           key={opt.value}
           value={opt.value}
           title={opt.title}
-          className={(state) =>
-            cn(
-              "inline-flex min-w-0 cursor-pointer items-center justify-center gap-1 rounded-md font-medium transition-colors select-none focus-visible:ring-2 focus-visible:outline-hidden",
-              size === "xs" ? "px-2 py-1 text-[11px]" : "px-2.5 py-1.5 text-xs",
-              state.checked
-                ? "bg-background text-foreground shadow-xs"
-                : "text-muted-foreground hover:text-foreground",
-            )
-          }
+          className={cn(
+            "text-muted-foreground hover:text-foreground hover:bg-transparent data-[state=on]:bg-background data-[state=on]:text-foreground h-auto min-w-0 rounded-md font-medium shadow-none first:rounded-md last:rounded-md data-[state=on]:shadow-xs",
+            "text-xs",
+            size === "xs" ? "px-2 py-1" : "px-2.5 py-1.5",
+          )}
         >
           {opt.label}
-        </SegmentedControlItem>
+        </ToggleGroupItem>
       ))}
-    </SegmentedControl>
+    </ToggleGroup>
   );
 }
 
 interface BuilderSwitchRowProps {
   label: string;
-  description?: string;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
 }
 
-export function BuilderSwitchRow({
-  label,
-  description,
-  checked,
-  onCheckedChange,
-}: BuilderSwitchRowProps) {
+export function BuilderSwitchRow({ label, checked, onCheckedChange }: BuilderSwitchRowProps) {
+  const switchId = useId();
   return (
-    <label className="hover:bg-muted/50 flex cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2 transition-colors">
-      <div className="min-w-0 space-y-0.5">
-        <div className="text-xs font-medium">{label}</div>
-        {description && <div className="text-muted-foreground text-[11px]">{description}</div>}
-      </div>
-      <Switch
-        checked={checked}
-        onCheckedChange={(next) => onCheckedChange(next)}
-        className={(state) =>
-          cn(
-            "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:ring-2 focus-visible:outline-hidden",
-            state.checked ? "bg-primary" : "bg-input",
-          )
-        }
-      >
-        <SwitchThumb
-          className={(state) =>
-            cn(
-              "bg-background pointer-events-none block size-4 rounded-full shadow-xs transition-transform",
-              state.checked ? "translate-x-4" : "translate-x-0",
-            )
-          }
-        />
-      </Switch>
-    </label>
+    <div className="flex items-center justify-between gap-3 py-1">
+      <Label htmlFor={switchId} className="min-w-0 cursor-pointer text-xs font-medium">
+        {label}
+      </Label>
+      <Switch id={switchId} checked={checked} onCheckedChange={onCheckedChange} />
+    </div>
   );
 }
 
@@ -130,6 +103,46 @@ function groupOptions(options: DataBindingOption[]): Map<string, DataBindingOpti
     grouped.set(opt.group, list);
   }
   return grouped;
+}
+
+function BindingPathSelect({
+  id,
+  value,
+  options,
+  dataModel,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  options: DataBindingOption[];
+  dataModel: DataModel;
+  onChange: (path: string) => void;
+}) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger id={id} className="h-9 text-xs">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {Array.from(groupOptions(options), ([group, fields]) => (
+          <SelectGroup key={group}>
+            <SelectLabel>{group}</SelectLabel>
+            {fields.map(({ path, label }) => {
+              const preview = getByPath(dataModel, path);
+              return (
+                <SelectItem key={path} value={path} className="text-xs">
+                  <span>{label}</span>
+                  {preview !== undefined && (
+                    <span className="text-muted-foreground ml-1">（{String(preview)}）</span>
+                  )}
+                </SelectItem>
+              );
+            })}
+          </SelectGroup>
+        ))}
+      </SelectContent>
+    </Select>
+  );
 }
 
 function isBoundPath<T>(val: BoundValue<T> | undefined): val is { "@path": string } {
@@ -156,12 +169,14 @@ export function BoundStringControl({
   const mode: "literal" | "path" = isBoundPath(value) ? "path" : "literal";
   const currentPath = isBoundPath(value) ? value["@path"] : STRING_BINDING_OPTIONS[0]!.path;
   const currentLiteral = typeof value === "string" ? value : "";
-  const grouped = groupOptions(STRING_BINDING_OPTIONS);
+  const fieldId = useId();
 
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2">
-        <Label className="text-xs">{label}</Label>
+        <Label htmlFor={fieldId} className="text-xs">
+          {label}
+        </Label>
         <div className="w-36">
           <BuilderSegmentedControl
             size="xs"
@@ -186,36 +201,19 @@ export function BoundStringControl({
       </div>
 
       {mode === "path" ? (
-        <Select value={currentPath} onValueChange={(nextPath) => onChange({ "@path": nextPath })}>
-          <SelectTrigger className="h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Array.from(grouped.entries()).map(([group, opts]) => (
-              <SelectGroup key={group}>
-                <SelectLabel className="text-[11px]">{group}</SelectLabel>
-                {opts.map((opt) => {
-                  const previewVal = getByPath(dataModel, opt.path);
-                  return (
-                    <SelectItem key={opt.path} value={opt.path} className="text-xs">
-                      <span>{opt.label}</span>
-                      {previewVal !== undefined && (
-                        <span className="text-muted-foreground ml-1.5 text-[11px]">
-                          ({String(previewVal)})
-                        </span>
-                      )}
-                    </SelectItem>
-                  );
-                })}
-              </SelectGroup>
-            ))}
-          </SelectContent>
-        </Select>
+        <BindingPathSelect
+          id={fieldId}
+          value={currentPath}
+          options={STRING_BINDING_OPTIONS}
+          dataModel={dataModel}
+          onChange={(path) => onChange({ "@path": path })}
+        />
       ) : (
         <Input
+          id={fieldId}
           value={currentLiteral}
           placeholder={placeholder}
-          className="h-8 text-xs"
+          className="h-9 text-xs"
           onChange={(e) => {
             const next = e.target.value;
             onChange(allowEmpty && next === "" ? undefined : next);
@@ -244,12 +242,14 @@ export function BoundNumberControl({
   const mode: "literal" | "path" = isBoundPath(value) ? "path" : "literal";
   const currentPath = isBoundPath(value) ? value["@path"] : NUMBER_BINDING_OPTIONS[0]!.path;
   const currentNumber = typeof value === "number" ? value : fallbackNumber;
-  const grouped = groupOptions(NUMBER_BINDING_OPTIONS);
+  const fieldId = useId();
 
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2">
-        <Label className="text-xs">{label}</Label>
+        <Label htmlFor={fieldId} className="text-xs">
+          {label}
+        </Label>
         <div className="w-36">
           <BuilderSegmentedControl
             size="xs"
@@ -274,36 +274,19 @@ export function BoundNumberControl({
       </div>
 
       {mode === "path" ? (
-        <Select value={currentPath} onValueChange={(nextPath) => onChange({ "@path": nextPath })}>
-          <SelectTrigger className="h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Array.from(grouped.entries()).map(([group, opts]) => (
-              <SelectGroup key={group}>
-                <SelectLabel className="text-[11px]">{group}</SelectLabel>
-                {opts.map((opt) => {
-                  const previewVal = getByPath(dataModel, opt.path);
-                  return (
-                    <SelectItem key={opt.path} value={opt.path} className="text-xs">
-                      <span>{opt.label}</span>
-                      {previewVal !== undefined && (
-                        <span className="text-muted-foreground ml-1.5 text-[11px]">
-                          ({String(previewVal)})
-                        </span>
-                      )}
-                    </SelectItem>
-                  );
-                })}
-              </SelectGroup>
-            ))}
-          </SelectContent>
-        </Select>
+        <BindingPathSelect
+          id={fieldId}
+          value={currentPath}
+          options={NUMBER_BINDING_OPTIONS}
+          dataModel={dataModel}
+          onChange={(path) => onChange({ "@path": path })}
+        />
       ) : (
         <Input
+          id={fieldId}
           type="number"
           value={String(currentNumber)}
-          className="h-8 text-xs tabular-nums"
+          className="h-9 text-xs tabular-nums"
           onChange={(e) => {
             const parsed = Number(e.target.value);
             onChange(Number.isFinite(parsed) ? parsed : 0);
