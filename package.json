@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vp dev",
-    "codex:server": "node scripts/codex-server.mjs",
+    "codex:server": "vpx ./scripts/codex-server.ts",
     "build": "vp build",
     "preview": "vp preview",
     "postinstall": "void prepare",

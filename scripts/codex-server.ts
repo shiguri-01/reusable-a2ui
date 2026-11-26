@@ -95,7 +95,7 @@ proxyServer.listen(PUBLIC_PORT, PUBLIC_HOST, () => {
   console.log(`[codex:server] Kakeibo MCP server configured: ${MCP_URL}`);
 });
 
-function shutdown() {
+function shutdown(): void {
   proxyServer.close();
   codexProc.kill();
 }
