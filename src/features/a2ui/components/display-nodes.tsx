@@ -35,29 +35,23 @@ export function renderDisplayNode(node: DisplayNode, ctx: A2UIRenderContext): Re
     case "Text": {
       const text = resolveValue(mergedModel, node.text) ?? "";
       switch (node.variant) {
-        case "h1":
+        case "title":
           return (
-            <h1
+            <p
               key={node.id}
-              className={cn("font-bold tracking-tight", compact ? "text-lg" : "text-2xl")}
+              className={cn("font-bold tracking-tight", compact ? "text-base" : "text-xl")}
             >
               {text}
-            </h1>
+            </p>
           );
-        case "h2":
+        case "subtitle":
           return (
-            <h2
+            <p
               key={node.id}
-              className={cn("font-semibold tracking-tight", compact ? "text-base" : "text-lg")}
+              className={cn("font-semibold tracking-tight", compact ? "text-sm" : "text-base")}
             >
               {text}
-            </h2>
-          );
-        case "h3":
-          return (
-            <h3 key={node.id} className={cn("font-semibold", compact ? "text-sm" : "text-base")}>
-              {text}
-            </h3>
+            </p>
           );
         case "metric":
           return (
@@ -71,7 +65,7 @@ export function renderDisplayNode(node: DisplayNode, ctx: A2UIRenderContext): Re
               {text}
             </p>
           );
-        case "muted":
+        case "caption":
           return (
             <p
               key={node.id}

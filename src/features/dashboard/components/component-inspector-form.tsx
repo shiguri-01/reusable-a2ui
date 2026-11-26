@@ -391,7 +391,7 @@ export function ComponentInspector({
                   <Select
                     value={(field.state.value as string | undefined) ?? "body"}
                     onValueChange={(val) => {
-                      const variant = val as "h1" | "h2" | "h3" | "body" | "muted" | "metric";
+                      const variant = val as "title" | "subtitle" | "body" | "caption" | "metric";
                       field.handleChange(variant);
                       commitPatch({ variant });
                     }}
@@ -400,14 +400,11 @@ export function ComponentInspector({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="h1" className="text-xs">
-                        大見出し
+                      <SelectItem value="title" className="text-xs">
+                        タイトル
                       </SelectItem>
-                      <SelectItem value="h2" className="text-xs">
-                        中見出し
-                      </SelectItem>
-                      <SelectItem value="h3" className="text-xs">
-                        小見出し
+                      <SelectItem value="subtitle" className="text-xs">
+                        サブタイトル
                       </SelectItem>
                       <SelectItem value="metric" className="text-xs">
                         強調数値
@@ -415,7 +412,7 @@ export function ComponentInspector({
                       <SelectItem value="body" className="text-xs">
                         本文
                       </SelectItem>
-                      <SelectItem value="muted" className="text-xs">
+                      <SelectItem value="caption" className="text-xs">
                         補足テキスト
                       </SelectItem>
                     </SelectContent>
@@ -1102,24 +1099,28 @@ export function ComponentInspector({
                 const act = (field.state.value as Extract<
                   A2UIComponent,
                   { component: "Button" }
-                >["action"]) ?? { name: "createExpense" };
-                const promptText = typeof act.payload?.text === "string" ? act.payload.text : "";
+                >["action"]) ?? { event: { name: "createExpense" } };
+                const eventName = act.event.name;
+                const promptText =
+                  typeof act.event.context?.text === "string" ? act.event.context.text : "";
                 return (
                   <div className="space-y-2.5">
                     <div className="space-y-1.5">
                       <Label className="text-xs">クリック時の動作</Label>
                       <Select
-                        value={act.name}
+                        value={eventName}
                         onValueChange={(nextName) => {
                           const nextAction =
                             nextName === "sendPrompt"
                               ? {
-                                  name: "sendPrompt",
-                                  payload: {
-                                    text: promptText || "今月の支出状況を分析して",
+                                  event: {
+                                    name: "sendPrompt",
+                                    context: {
+                                      text: promptText || "今月の支出状況を分析して",
+                                    },
                                   },
                                 }
-                              : { name: "createExpense" };
+                              : { event: { name: "createExpense" } };
                           field.handleChange(nextAction);
                           commitPatch({ action: nextAction });
                         }}
@@ -1138,7 +1139,7 @@ export function ComponentInspector({
                       </Select>
                     </div>
 
-                    {act.name === "sendPrompt" && (
+                    {eventName === "sendPrompt" && (
                       <div className="space-y-1.5">
                         <Label className="text-xs">送信する質問文</Label>
                         <Input
@@ -1147,8 +1148,10 @@ export function ComponentInspector({
                           className="h-9 text-xs"
                           onChange={(e) => {
                             const nextAction = {
-                              name: "sendPrompt",
-                              payload: { text: e.target.value },
+                              event: {
+                                name: "sendPrompt",
+                                context: { text: e.target.value },
+                              },
                             };
                             field.handleChange(nextAction);
                             commitPatch({ action: nextAction });

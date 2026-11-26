@@ -391,7 +391,7 @@ export function useDashboardController({
   const handleAction = async (act: A2UIAction) => {
     setFeedback(null);
     if (act.name === "sendPrompt") {
-      const text = typeof act.payload?.text === "string" ? act.payload.text.trim() : "";
+      const text = typeof act.context?.text === "string" ? act.context.text.trim() : "";
       if (text && onSendPromptToAssistant) {
         onSendPromptToAssistant(text);
       }

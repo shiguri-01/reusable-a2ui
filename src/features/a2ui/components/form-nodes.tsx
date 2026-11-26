@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select";
 import { ALL_CATEGORY_LABEL } from "@/features/expenses/model";
 import { cn } from "@/lib/utils";
-import { getByPath } from "../data-model";
+import { getByPath, resolveContextRecord, resolveValue } from "../data-model";
 import type { A2UIComponent } from "../types";
 import type { A2UIRenderContext } from "./render-context";
 
@@ -23,7 +23,7 @@ type FormNode = Extract<
 >;
 
 export function renderFormNode(node: FormNode, ctx: A2UIRenderContext): ReactNode {
-  const { idPrefix, mergedModel, pending, compact, updatePath, onAction } = ctx;
+  const { surfaceId, idPrefix, mergedModel, pending, compact, updatePath, onAction } = ctx;
 
   switch (node.component) {
     case "FilterChips": {
@@ -143,7 +143,18 @@ export function renderFormNode(node: FormNode, ctx: A2UIRenderContext): ReactNod
           variant={node.variant ?? "default"}
           disabled={pending}
           className={cn(node.fullWidth && "w-full")}
-          onClick={() => onAction(node.action)}
+          onClick={() => {
+            const { event } = node.action;
+            const userMessage = resolveValue(mergedModel, event.userMessage);
+            onAction({
+              name: event.name,
+              surfaceId,
+              sourceComponentId: node.id,
+              timestamp: new Date().toISOString(),
+              ...(userMessage !== undefined ? { userMessage } : {}),
+              context: resolveContextRecord(mergedModel, event.context),
+            });
+          }}
         >
           {node.label}
         </Button>

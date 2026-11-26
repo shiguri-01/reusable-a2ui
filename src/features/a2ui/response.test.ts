@@ -1,18 +1,30 @@
 import { describe, expect, it } from "vite-plus/test";
+import { buildSurfaceState } from "./data-model";
 import { parseInlineA2UIResponse } from "./response";
-import { DASHBOARD_SURFACE_ID } from "./types";
+import { A2UI_PROTOCOL_VERSION, DASHBOARD_SURFACE_ID, EXPENSE_CATALOG_ID } from "./types";
 import { validateA2UISurfaceMessages } from "./validate";
 
 const inlineSurface = [
   {
-    version: "0.9",
-    createSurface: { surfaceId: "chat-inline", catalogId: "expense", rootId: "root" },
+    version: A2UI_PROTOCOL_VERSION,
+    createSurface: {
+      surfaceId: "chat-inline",
+      catalogId: EXPENSE_CATALOG_ID,
+      components: [{ id: "root", component: "Text" as const, text: "予算 `確認`" }],
+    },
+  },
+];
+
+const streamedSurface = [
+  {
+    version: A2UI_PROTOCOL_VERSION,
+    createSurface: { surfaceId: "chat-inline", catalogId: EXPENSE_CATALOG_ID },
   },
   {
-    version: "0.9",
+    version: A2UI_PROTOCOL_VERSION,
     updateComponents: {
       surfaceId: "chat-inline",
-      components: [{ id: "root", component: "Text", text: "予算 `確認`" }],
+      components: [{ id: "root", component: "Text" as const, text: "予算 `確認`" }],
     },
   },
 ];
@@ -54,9 +66,10 @@ describe("parseInlineA2UIResponse", () => {
   });
 });
 
-describe("validateA2UISurfaceMessages", () => {
-  it("validates expected surfaceId, rootId, unique IDs, and children references", () => {
+describe("validateA2UISurfaceMessages (v1.0)", () => {
+  it("validates single-message and streamed surfaces, root existence, unique IDs, and children references", () => {
     expect(validateA2UISurfaceMessages(inlineSurface).ok).toBe(true);
+    expect(validateA2UISurfaceMessages(streamedSurface).ok).toBe(true);
 
     const wrongSurface = validateA2UISurfaceMessages(inlineSurface, {
       expectedSurfaceId: DASHBOARD_SURFACE_ID,
@@ -65,13 +78,10 @@ describe("validateA2UISurfaceMessages", () => {
 
     const missingChild = validateA2UISurfaceMessages([
       {
-        version: "0.9",
-        createSurface: { surfaceId: "chat-inline", catalogId: "expense", rootId: "root" },
-      },
-      {
-        version: "0.9",
-        updateComponents: {
+        version: "1.0",
+        createSurface: {
           surfaceId: "chat-inline",
+          catalogId: EXPENSE_CATALOG_ID,
           components: [{ id: "root", component: "Column", children: ["ghost"] }],
         },
       },
@@ -80,13 +90,10 @@ describe("validateA2UISurfaceMessages", () => {
 
     const duplicateId = validateA2UISurfaceMessages([
       {
-        version: "0.9",
-        createSurface: { surfaceId: "chat-inline", catalogId: "expense", rootId: "root" },
-      },
-      {
-        version: "0.9",
-        updateComponents: {
+        version: "1.0",
+        createSurface: {
           surfaceId: "chat-inline",
+          catalogId: EXPENSE_CATALOG_ID,
           components: [
             { id: "root", component: "Text", text: "a" },
             { id: "root", component: "Text", text: "b" },
@@ -95,5 +102,32 @@ describe("validateA2UISurfaceMessages", () => {
       },
     ]);
     expect(duplicateId.ok).toBe(false);
+  });
+
+  it("supports inline dataModel and deleting keys via updateDataModel value: null", () => {
+    const validated = validateA2UISurfaceMessages([
+      {
+        version: "1.0",
+        createSurface: {
+          surfaceId: "chat-inline",
+          catalogId: EXPENSE_CATALOG_ID,
+          components: [{ id: "root", component: "Text", text: { "@path": "/note" } }],
+          dataModel: { note: "hello", transient: "remove-me" },
+        },
+      },
+      {
+        version: "1.0",
+        updateDataModel: {
+          surfaceId: "chat-inline",
+          path: "/transient",
+          value: null,
+        },
+      },
+    ]);
+
+    expect(validated.ok).toBe(true);
+    if (!validated.ok) return;
+    const state = buildSurfaceState(validated.messages);
+    expect(state?.initialDataModel).toEqual({ note: "hello" });
   });
 });

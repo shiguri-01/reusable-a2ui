@@ -1,26 +1,52 @@
 import { z } from "zod";
 
+export const A2UI_PROTOCOL_VERSION = "1.0" as const;
+export const A2UI_ROOT_ID = "root" as const;
+
 export const boundStringSchema = z.union([z.string(), z.object({ "@path": z.string() })]);
 export const boundNumberSchema = z.union([z.number(), z.object({ "@path": z.string() })]);
 
 export type BoundValue<T> = T | { "@path": string };
 
-export const a2uiActionSchema = z.object({
-  name: z.string().min(1),
-  payload: z.record(z.string(), z.unknown()).optional(),
+/**
+ * A2UI v1.0 Action definition on components (`common_types.json#/$defs/Action`).
+ */
+export const a2uiComponentActionSchema = z.object({
+  event: z.object({
+    name: z.string().min(1),
+    userMessage: boundStringSchema.optional(),
+    context: z.record(z.string(), z.unknown()).optional(),
+  }),
 });
 
-export type A2UIAction = z.infer<typeof a2uiActionSchema>;
+export type A2UIComponentAction = z.infer<typeof a2uiComponentActionSchema>;
+
+/**
+ * Outbound renderer-to-agent action event (`renderer_to_agent.json#/properties/action`).
+ */
+export interface A2UIAction {
+  name: string;
+  surfaceId?: string;
+  sourceComponentId?: string;
+  timestamp?: string;
+  userMessage?: string;
+  context?: Record<string, unknown>;
+}
+
+const componentCommonFields = {
+  id: z.string().min(1),
+  "@catalogId": z.string().min(1).optional(),
+};
 
 export const a2uiComponentSchema = z.discriminatedUnion("component", [
   z.object({
-    id: z.string().min(1),
+    ...componentCommonFields,
     component: z.literal("Column"),
     children: z.array(z.string()),
     gap: z.enum(["sm", "md", "lg"]).optional(),
   }),
   z.object({
-    id: z.string().min(1),
+    ...componentCommonFields,
     component: z.literal("Row"),
     children: z.array(z.string()),
     gap: z.enum(["sm", "md", "lg"]).optional(),
@@ -29,37 +55,37 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
     wrap: z.boolean().optional(),
   }),
   z.object({
-    id: z.string().min(1),
+    ...componentCommonFields,
     component: z.literal("Grid"),
     children: z.array(z.string()),
     columns: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]).optional(),
     gap: z.enum(["sm", "md", "lg"]).optional(),
   }),
   z.object({
-    id: z.string().min(1),
+    ...componentCommonFields,
     component: z.literal("Card"),
     title: boundStringSchema.optional(),
     description: boundStringSchema.optional(),
     children: z.array(z.string()),
   }),
   z.object({
-    id: z.string().min(1),
+    ...componentCommonFields,
     component: z.literal("Divider"),
   }),
   z.object({
-    id: z.string().min(1),
+    ...componentCommonFields,
     component: z.literal("Text"),
     text: boundStringSchema,
-    variant: z.enum(["h1", "h2", "h3", "body", "muted", "metric"]).optional(),
+    variant: z.enum(["title", "subtitle", "body", "caption", "metric"]).optional(),
   }),
   z.object({
-    id: z.string().min(1),
+    ...componentCommonFields,
     component: z.literal("Badge"),
     text: boundStringSchema,
     variant: z.enum(["default", "secondary", "outline", "destructive"]).optional(),
   }),
   z.object({
-    id: z.string().min(1),
+    ...componentCommonFields,
     component: z.literal("MetricCard"),
     label: z.string(),
     value: boundStringSchema,
@@ -67,7 +93,7 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
     badge: boundStringSchema.optional(),
   }),
   z.object({
-    id: z.string().min(1),
+    ...componentCommonFields,
     component: z.literal("ProgressBar"),
     label: z.string(),
     value: boundNumberSchema,
@@ -76,7 +102,7 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
   }),
   z
     .object({
-      id: z.string().min(1),
+      ...componentCommonFields,
       component: z.literal("CategoryBreakdown"),
       dataPath: z.string(),
       emptyText: z.string().optional(),
@@ -89,14 +115,14 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
     })
     .describe("カテゴリ別の支出額と構成比を金額順の横棒で比較する。"),
   z.object({
-    id: z.string().min(1),
+    ...componentCommonFields,
     component: z.literal("FilterChips"),
     bindPath: z.string(),
     options: z.array(z.string()),
     allLabel: z.string().optional(),
   }),
   z.object({
-    id: z.string().min(1),
+    ...componentCommonFields,
     component: z.literal("TextField"),
     label: z.string(),
     bindPath: z.string(),
@@ -104,7 +130,7 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
     required: z.boolean().optional(),
   }),
   z.object({
-    id: z.string().min(1),
+    ...componentCommonFields,
     component: z.literal("NumberField"),
     label: z.string(),
     bindPath: z.string(),
@@ -113,30 +139,30 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
     suffix: z.string().optional(),
   }),
   z.object({
-    id: z.string().min(1),
+    ...componentCommonFields,
     component: z.literal("DateField"),
     label: z.string(),
     bindPath: z.string(),
   }),
   z.object({
-    id: z.string().min(1),
+    ...componentCommonFields,
     component: z.literal("SelectField"),
     label: z.string(),
     bindPath: z.string(),
     options: z.array(z.string()),
   }),
   z.object({
-    id: z.string().min(1),
+    ...componentCommonFields,
     component: z.literal("Button"),
     label: z.string(),
     variant: z.enum(["default", "secondary", "outline", "destructive", "ghost"]).optional(),
-    action: a2uiActionSchema.describe(
-      "createExpense はフォームの支出を登録する。sendPrompt は payload.text をチャットに送る。",
+    action: a2uiComponentActionSchema.describe(
+      "event.name が createExpense ならフォームの支出を登録。sendPrompt なら event.context.text をチャットに送る。",
     ),
     fullWidth: z.boolean().optional(),
   }),
   z.object({
-    id: z.string().min(1),
+    ...componentCommonFields,
     component: z.literal("ExpenseList"),
     dataPath: z.string(),
     filterPath: z.string().optional(),
@@ -151,7 +177,7 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
     limit: z.number().int().positive().optional(),
   }),
   z.object({
-    id: z.string().min(1),
+    ...componentCommonFields,
     component: z.literal("KeyValueList"),
     items: z.array(
       z.object({
@@ -162,7 +188,7 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
     ),
   }),
   z.object({
-    id: z.string().min(1),
+    ...componentCommonFields,
     component: z.literal("Alert"),
     title: boundStringSchema.optional(),
     text: boundStringSchema,
@@ -172,35 +198,52 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
 
 export type A2UIComponent = z.infer<typeof a2uiComponentSchema>;
 
+/**
+ * A2UI v1.0 Agent-to-Renderer messages (`specification/v1_0/json/agent_to_renderer.json`).
+ */
 export const a2uiMessageSchema = z.union([
   z.object({
-    version: z.literal("0.9"),
-    createSurface: z.object({
-      surfaceId: z.string().min(1),
-      catalogId: z.string().min(1),
-      rootId: z.string().min(1),
-    }),
+    version: z.literal(A2UI_PROTOCOL_VERSION),
+    createSurface: z
+      .object({
+        surfaceId: z.string().min(1),
+        catalogId: z.string().min(1).optional(),
+        sendDataModel: z.boolean().optional(),
+        components: z.array(a2uiComponentSchema).min(1).optional(),
+        dataModel: z.record(z.string(), z.unknown()).optional(),
+      })
+      .strict(),
   }),
   z.object({
-    version: z.literal("0.9"),
-    updateComponents: z.object({
-      surfaceId: z.string().min(1),
-      components: z.array(a2uiComponentSchema),
-    }),
+    version: z.literal(A2UI_PROTOCOL_VERSION),
+    updateComponents: z
+      .object({
+        surfaceId: z.string().min(1),
+        components: z.array(a2uiComponentSchema).min(1),
+      })
+      .strict(),
   }),
   z.object({
-    version: z.literal("0.9"),
-    updateDataModel: z.object({
-      surfaceId: z.string().min(1),
-      path: z.string().optional(),
-      value: z.unknown(),
-    }),
+    version: z.literal(A2UI_PROTOCOL_VERSION),
+    updateDataModel: z
+      .object({
+        surfaceId: z.string().min(1),
+        path: z.string().optional(),
+        value: z.unknown(),
+      })
+      .strict()
+      .refine((data) => "value" in data && data.value !== undefined, {
+        message: "updateDataModel.value は必須です（削除する場合は null を指定）",
+        path: ["value"],
+      }),
   }),
   z.object({
-    version: z.literal("0.9"),
-    deleteSurface: z.object({
-      surfaceId: z.string().min(1),
-    }),
+    version: z.literal(A2UI_PROTOCOL_VERSION),
+    deleteSurface: z
+      .object({
+        surfaceId: z.string().min(1),
+      })
+      .strict(),
   }),
 ]);
 
@@ -208,6 +251,6 @@ export type A2UIMessage = z.infer<typeof a2uiMessageSchema>;
 
 export const a2uiMessagesSchema = z.array(a2uiMessageSchema).min(1);
 
-export const EXPENSE_CATALOG_ID = "https://reusable-a2ui.local/catalogs/expense-shadcn-v1";
+export const EXPENSE_CATALOG_ID = "reusable-a2ui.local:expense-shadcn-v1";
 export const DASHBOARD_SURFACE_ID = "expense-dashboard";
 export const CHAT_INLINE_SURFACE_ID = "chat-inline";

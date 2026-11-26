@@ -1,5 +1,10 @@
 import { EXPENSE_CATEGORIES } from "../expenses/model";
-import { EXPENSE_CATALOG_ID, type A2UIMessage } from "./types";
+import {
+  A2UI_PROTOCOL_VERSION,
+  DASHBOARD_SURFACE_ID,
+  EXPENSE_CATALOG_ID,
+  type A2UIMessage,
+} from "./types";
 
 export interface PresetUiVersion {
   version: number;
@@ -15,17 +20,10 @@ export const PRESET_UI_VERSIONS: PresetUiVersion[] = [
     description: "まずは金額と内容だけ素早く記録できる最小構成のダッシュボード",
     messages: [
       {
-        version: "0.9",
+        version: A2UI_PROTOCOL_VERSION,
         createSurface: {
-          surfaceId: "expense-dashboard",
+          surfaceId: DASHBOARD_SURFACE_ID,
           catalogId: EXPENSE_CATALOG_ID,
-          rootId: "root",
-        },
-      },
-      {
-        version: "0.9",
-        updateComponents: {
-          surfaceId: "expense-dashboard",
           components: [
             {
               id: "root",
@@ -66,7 +64,7 @@ export const PRESET_UI_VERSIONS: PresetUiVersion[] = [
               id: "submit-btn",
               component: "Button",
               label: "記録する",
-              action: { name: "createExpense" },
+              action: { event: { name: "createExpense" } },
             },
             {
               id: "recent-list-card",
@@ -92,17 +90,10 @@ export const PRESET_UI_VERSIONS: PresetUiVersion[] = [
     description: "合計金額や平均が見えるKPIカードと、カテゴリ・日付入力を追加",
     messages: [
       {
-        version: "0.9",
+        version: A2UI_PROTOCOL_VERSION,
         createSurface: {
-          surfaceId: "expense-dashboard",
+          surfaceId: DASHBOARD_SURFACE_ID,
           catalogId: EXPENSE_CATALOG_ID,
-          rootId: "root",
-        },
-      },
-      {
-        version: "0.9",
-        updateComponents: {
-          surfaceId: "expense-dashboard",
           components: [
             {
               id: "root",
@@ -192,7 +183,7 @@ export const PRESET_UI_VERSIONS: PresetUiVersion[] = [
               component: "Button",
               label: "支出を追加",
               fullWidth: true,
-              action: { name: "createExpense" },
+              action: { event: { name: "createExpense" } },
             },
             {
               id: "list-card",
@@ -219,17 +210,10 @@ export const PRESET_UI_VERSIONS: PresetUiVersion[] = [
     description: "予算消化バー・カテゴリ別内訳・絞り込みフィルタ・削除操作を備えたフル機能版",
     messages: [
       {
-        version: "0.9",
+        version: A2UI_PROTOCOL_VERSION,
         createSurface: {
-          surfaceId: "expense-dashboard",
+          surfaceId: DASHBOARD_SURFACE_ID,
           catalogId: EXPENSE_CATALOG_ID,
-          rootId: "root",
-        },
-      },
-      {
-        version: "0.9",
-        updateComponents: {
-          surfaceId: "expense-dashboard",
           components: [
             {
               id: "root",
@@ -353,7 +337,7 @@ export const PRESET_UI_VERSIONS: PresetUiVersion[] = [
               component: "Button",
               label: "支出を記録する",
               fullWidth: true,
-              action: { name: "createExpense" },
+              action: { event: { name: "createExpense" } },
             },
             {
               id: "breakdown-card",

@@ -1,5 +1,7 @@
 import { arrayMove } from "@dnd-kit/sortable";
 import {
+  A2UI_PROTOCOL_VERSION,
+  A2UI_ROOT_ID,
   DASHBOARD_SURFACE_ID,
   EXPENSE_CATALOG_ID,
   type A2UIComponent,
@@ -26,6 +28,7 @@ export interface EditableSurfaceGraph {
   surfaceId: string;
   catalogId: string;
   rootId: string;
+  initialDataModel?: Record<string, unknown>;
   components: A2UIComponent[];
   componentsById: Map<string, A2UIComponent>;
   parentById: Map<string, string>;
@@ -44,20 +47,13 @@ export function isContainerComponent(comp: A2UIComponent): comp is ContainerComp
 export function createEmptyDashboardMessages(): A2UIMessage[] {
   return [
     {
-      version: "0.9",
+      version: A2UI_PROTOCOL_VERSION,
       createSurface: {
         surfaceId: DASHBOARD_SURFACE_ID,
         catalogId: EXPENSE_CATALOG_ID,
-        rootId: "root",
-      },
-    },
-    {
-      version: "0.9",
-      updateComponents: {
-        surfaceId: DASHBOARD_SURFACE_ID,
         components: [
           {
-            id: "root",
+            id: A2UI_ROOT_ID,
             component: "Column",
             gap: "lg",
             children: [],
@@ -71,16 +67,24 @@ export function createEmptyDashboardMessages(): A2UIMessage[] {
 export function extractEditableSurface(messages: A2UIMessage[]): EditableSurfaceGraph {
   let surfaceId = DASHBOARD_SURFACE_ID;
   let catalogId = EXPENSE_CATALOG_ID;
-  let rootId = "root";
+  const rootId = A2UI_ROOT_ID;
+  let initialDataModel: Record<string, unknown> | undefined;
   const componentsById = new Map<string, A2UIComponent>();
   const extraMessages: A2UIMessage[] = [];
 
   for (const msg of messages) {
     if ("createSurface" in msg) {
       surfaceId = msg.createSurface.surfaceId;
-      catalogId = msg.createSurface.catalogId;
-      rootId = msg.createSurface.rootId;
+      catalogId = msg.createSurface.catalogId ?? EXPENSE_CATALOG_ID;
+      initialDataModel = msg.createSurface.dataModel
+        ? { ...msg.createSurface.dataModel }
+        : undefined;
       componentsById.clear();
+      if (msg.createSurface.components) {
+        for (const comp of msg.createSurface.components) {
+          componentsById.set(comp.id, comp);
+        }
+      }
     } else if ("updateComponents" in msg) {
       for (const comp of msg.updateComponents.components) {
         componentsById.set(comp.id, comp);
@@ -114,6 +118,7 @@ export function extractEditableSurface(messages: A2UIMessage[]): EditableSurface
     surfaceId,
     catalogId,
     rootId,
+    ...(initialDataModel ? { initialDataModel } : {}),
     components: Array.from(componentsById.values()),
     componentsById,
     parentById,
@@ -123,7 +128,7 @@ export function extractEditableSurface(messages: A2UIMessage[]): EditableSurface
 
 /**
  * Normalizes components in pre-order tree traversal starting from rootId so that
- * serialized JSON stays clean, deterministic, and easy to read.
+ * serialized A2UI v1.0 JSON stays clean, deterministic, and easy to read.
  */
 export function commitComponentsToMessages(
   baseMessages: A2UIMessage[],
@@ -157,18 +162,12 @@ export function commitComponentsToMessages(
 
   return [
     {
-      version: "0.9",
+      version: A2UI_PROTOCOL_VERSION,
       createSurface: {
         surfaceId: graph.surfaceId,
         catalogId: graph.catalogId,
-        rootId,
-      },
-    },
-    {
-      version: "0.9",
-      updateComponents: {
-        surfaceId: graph.surfaceId,
         components: ordered,
+        ...(graph.initialDataModel ? { dataModel: graph.initialDataModel } : {}),
       },
     },
     ...graph.extraMessages,

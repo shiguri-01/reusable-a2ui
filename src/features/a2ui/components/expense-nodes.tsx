@@ -22,7 +22,7 @@ const categoryRowsSchema = z
   .array();
 
 export function renderExpenseNode(node: ExpenseNode, ctx: A2UIRenderContext): ReactNode {
-  const { mergedModel, pending, compact, onAction } = ctx;
+  const { surfaceId, mergedModel, pending, compact, onAction } = ctx;
 
   switch (node.component) {
     case "CategoryBreakdown": {
@@ -58,7 +58,10 @@ export function renderExpenseNode(node: ExpenseNode, ctx: A2UIRenderContext): Re
                     onClick: () =>
                       onAction({
                         name: "sendPrompt",
-                        payload: {
+                        surfaceId,
+                        sourceComponentId: node.id,
+                        timestamp: new Date().toISOString(),
+                        context: {
                           text: `${detailsPeriod}の「${item.category}」の支出明細を見せて`,
                         },
                       }),
@@ -142,7 +145,10 @@ export function renderExpenseNode(node: ExpenseNode, ctx: A2UIRenderContext): Re
                     onClick={() =>
                       onAction({
                         name: "deleteExpense",
-                        payload: { id: item.id },
+                        surfaceId,
+                        sourceComponentId: node.id,
+                        timestamp: new Date().toISOString(),
+                        context: { id: item.id },
                       })
                     }
                   >

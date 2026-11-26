@@ -39,6 +39,7 @@ export interface A2UISurfaceEditorProps {
 }
 
 export interface A2UIRenderContext {
+  surfaceId: string;
   idPrefix: string;
   mergedModel: DataModel;
   pending: boolean;

@@ -32,25 +32,8 @@ async function activateUiVersion(
 
 export async function ensureDefaultUiVersions(): Promise<UiVersion[]> {
   const existing = await listDashboardVersions();
-
   if (existing.length > 0) {
-    let updated = false;
-    for (const row of existing) {
-      const preset = PRESET_UI_VERSIONS.find((p) => p.version === row.version);
-      if (!preset) continue;
-      if (row.name.includes(": ") || row.messagesJson.includes("例: ")) {
-        await db
-          .update(uiVersions)
-          .set({
-            name: preset.name,
-            description: preset.description,
-            messagesJson: JSON.stringify(preset.messages, null, 2),
-          })
-          .where(eq(uiVersions.id, row.id));
-        updated = true;
-      }
-    }
-    return updated ? await listDashboardVersions() : existing;
+    return existing;
   }
 
   await db.insert(uiVersions).values(

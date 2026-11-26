@@ -114,6 +114,7 @@ export function A2UISurface({
   };
 
   const ctx: A2UIRenderContext = {
+    surfaceId: surface.surfaceId,
     idPrefix,
     mergedModel,
     pending,

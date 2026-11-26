@@ -45,7 +45,7 @@ export async function runExpenseA2UIAction(
   }
 
   if (act.name === "deleteExpense") {
-    const id = Number(act.payload?.id);
+    const id = Number(act.context?.id);
     if (!Number.isInteger(id) || id <= 0) return { ok: false };
 
     const res =

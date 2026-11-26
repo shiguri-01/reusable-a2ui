@@ -120,7 +120,7 @@ const proposeDashboardUiTool = defineTool({
       .describe("提案するバージョン名（例: v4：予算重視レイアウト）"),
     description: z.string().trim().max(240).optional().default("").describe("変更内容の短い要約"),
     messages: a2uiMessagesSchema.describe(
-      `surfaceId="${DASHBOARD_SURFACE_ID}" の有効な A2UI v0.9 メッセージ配列`,
+      `surfaceId="${DASHBOARD_SURFACE_ID}" の有効な A2UI v1.0 メッセージ配列`,
     ),
   }),
   execute: async (args) => {
@@ -150,7 +150,7 @@ const saveUiVersionTool = defineTool({
   inputSchema: z.object({
     name: z.string().trim().min(1).max(80).describe("バージョン名（例: v4：節約重視レイアウト）"),
     description: z.string().trim().max(240).optional().default("").describe("変更内容のメモ"),
-    messages: a2uiMessagesSchema.describe("有効な A2UI v0.9 メッセージ配列"),
+    messages: a2uiMessagesSchema.describe("有効な A2UI v1.0 メッセージ配列"),
   }),
   execute: async (args) => {
     const validated = assertValidDashboardMessages(args.messages);

@@ -1,4 +1,10 @@
-import type { A2UIComponent, A2UIMessage, BoundValue } from "./types";
+import {
+  A2UI_ROOT_ID,
+  EXPENSE_CATALOG_ID,
+  type A2UIComponent,
+  type A2UIMessage,
+  type BoundValue,
+} from "./types";
 
 export type DataModel = Record<string, unknown>;
 
@@ -39,7 +45,7 @@ export function setByPath(model: DataModel, path: string, value: unknown): DataM
   let cursor: Record<string, unknown> = clone;
 
   for (let i = 0; i < segments.length - 1; i++) {
-    const key = segments[i];
+    const key = segments[i]!;
     const existing = cursor[key];
     const next =
       existing && typeof existing === "object" && !Array.isArray(existing)
@@ -49,7 +55,31 @@ export function setByPath(model: DataModel, path: string, value: unknown): DataM
     cursor = next;
   }
 
-  cursor[segments[segments.length - 1]] = value;
+  cursor[segments[segments.length - 1]!] = value;
+  return clone;
+}
+
+export function deleteByPath(model: DataModel, path: string): DataModel {
+  const segments = splitPath(path);
+  if (segments.length === 0) {
+    return {};
+  }
+
+  const clone: DataModel = { ...model };
+  let cursor: Record<string, unknown> = clone;
+
+  for (let i = 0; i < segments.length - 1; i++) {
+    const key = segments[i]!;
+    const existing = cursor[key];
+    if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
+      return clone;
+    }
+    const next = { ...(existing as Record<string, unknown>) };
+    cursor[key] = next;
+    cursor = next;
+  }
+
+  delete cursor[segments[segments.length - 1]!];
   return clone;
 }
 
@@ -61,37 +91,63 @@ export function resolveValue<T>(model: DataModel, bound: BoundValue<T> | undefin
   return bound;
 }
 
+export function resolveContextRecord(
+  model: DataModel,
+  context: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  if (!context) return {};
+  const resolved: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(context)) {
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      "@path" in value &&
+      typeof (value as { "@path"?: unknown })["@path"] === "string"
+    ) {
+      resolved[key] = getByPath(model, (value as { "@path": string })["@path"]);
+    } else {
+      resolved[key] = value;
+    }
+  }
+  return resolved;
+}
+
 export function buildSurfaceState(messages: A2UIMessage[]): SurfaceState | null {
   let surfaceId = "";
-  let catalogId = "";
-  let rootId = "";
+  let catalogId = EXPENSE_CATALOG_ID;
   const componentsById = new Map<string, A2UIComponent>();
   let initialDataModel: DataModel = {};
 
   for (const message of messages) {
     if ("createSurface" in message) {
       surfaceId = message.createSurface.surfaceId;
-      catalogId = message.createSurface.catalogId;
-      rootId = message.createSurface.rootId;
+      catalogId = message.createSurface.catalogId ?? EXPENSE_CATALOG_ID;
       componentsById.clear();
+      initialDataModel = message.createSurface.dataModel
+        ? { ...message.createSurface.dataModel }
+        : {};
+      if (message.createSurface.components) {
+        for (const comp of message.createSurface.components) {
+          componentsById.set(comp.id, comp);
+        }
+      }
     } else if ("updateComponents" in message) {
       for (const comp of message.updateComponents.components) {
         componentsById.set(comp.id, comp);
       }
     } else if ("updateDataModel" in message) {
-      if (message.updateDataModel.path) {
-        initialDataModel = setByPath(
-          initialDataModel,
-          message.updateDataModel.path,
-          message.updateDataModel.value,
-        );
-      } else if (
-        typeof message.updateDataModel.value === "object" &&
-        message.updateDataModel.value !== null
-      ) {
+      const { path, value } = message.updateDataModel;
+      if (path && path !== "/") {
+        initialDataModel =
+          value === null
+            ? deleteByPath(initialDataModel, path)
+            : setByPath(initialDataModel, path, value);
+      } else if (value === null) {
+        initialDataModel = {};
+      } else if (typeof value === "object") {
         initialDataModel = {
           ...initialDataModel,
-          ...(message.updateDataModel.value as DataModel),
+          ...(value as DataModel),
         };
       }
     } else if ("deleteSurface" in message) {
@@ -101,12 +157,12 @@ export function buildSurfaceState(messages: A2UIMessage[]): SurfaceState | null 
     }
   }
 
-  if (!surfaceId || !rootId) return null;
+  if (!surfaceId || !componentsById.has(A2UI_ROOT_ID)) return null;
 
   return {
     surfaceId,
     catalogId,
-    rootId,
+    rootId: A2UI_ROOT_ID,
     componentsById,
     initialDataModel,
   };

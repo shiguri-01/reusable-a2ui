@@ -1,19 +1,16 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { A2UI_PROTOCOL_VERSION, EXPENSE_CATALOG_ID, type A2UIMessage } from "../types";
 import { A2UISurface } from "./a2ui-surface";
-import type { A2UIMessage } from "../types";
 
 describe("CategoryBreakdown", () => {
   const surfaceId = "chat-inline";
   const messages: A2UIMessage[] = [
     {
-      version: "0.9",
-      createSurface: { surfaceId, catalogId: "expense", rootId: "root" },
-    },
-    {
-      version: "0.9",
-      updateComponents: {
+      version: A2UI_PROTOCOL_VERSION,
+      createSurface: {
         surfaceId,
+        catalogId: EXPENSE_CATALOG_ID,
         components: [
           {
             id: "root",
@@ -22,17 +19,12 @@ describe("CategoryBreakdown", () => {
             detailsPeriod: "2026年11月",
           },
         ],
-      },
-    },
-    {
-      version: "0.9",
-      updateDataModel: {
-        surfaceId,
-        path: "/categoryBreakdown",
-        value: [
-          { category: "交通", total: 250, count: 2, ratio: 25 },
-          { category: "食費", total: 750, count: 3, ratioPercent: 75 },
-        ],
+        dataModel: {
+          categoryBreakdown: [
+            { category: "交通", total: 250, count: 2, ratio: 25 },
+            { category: "食費", total: 750, count: 3, ratioPercent: 75 },
+          ],
+        },
       },
     },
   ];

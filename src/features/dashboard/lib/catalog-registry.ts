@@ -329,7 +329,7 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
         component: "Button",
         label: "記録する",
         fullWidth: true,
-        action: { name: "createExpense" },
+        action: { event: { name: "createExpense" } },
       },
     ],
   },
@@ -401,7 +401,7 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
         component: "Button",
         label: "支出を記録する",
         fullWidth: true,
-        action: { name: "createExpense" },
+        action: { event: { name: "createExpense" } },
       },
     ],
   },
@@ -466,8 +466,10 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
         label: "今月の支出傾向を分析",
         variant: "secondary",
         action: {
-          name: "sendPrompt",
-          payload: { text: "今月の支出傾向と予算状況をコンパクトに振り返って" },
+          event: {
+            name: "sendPrompt",
+            context: { text: "今月の支出傾向と予算状況をコンパクトに振り返って" },
+          },
         },
       },
       {
@@ -476,8 +478,10 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
         label: "節約ポイントを相談",
         variant: "outline",
         action: {
-          name: "sendPrompt",
-          payload: { text: "最近の支出から無理なく節約できそうなポイントを提案して" },
+          event: {
+            name: "sendPrompt",
+            context: { text: "最近の支出から無理なく節約できそうなポイントを提案して" },
+          },
         },
       },
     ],
@@ -703,7 +707,7 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
       {
         id: "heading-text",
         component: "Text",
-        variant: "h2",
+        variant: "subtitle",
         text: "見出し",
       },
     ],
@@ -827,7 +831,7 @@ export const BLOCK_BLUEPRINTS: PaletteBlueprintEntry[] = [
         label: "支出を記録する",
         variant: "default",
         fullWidth: true,
-        action: { name: "createExpense" },
+        action: { event: { name: "createExpense" } },
       },
     ],
   },
