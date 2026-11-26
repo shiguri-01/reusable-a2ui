@@ -1,4 +1,4 @@
-import { Check, Code2, Columns2, Eye, X } from "lucide-react";
+import { Check, Columns2, Eye, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { CompareMode } from "../types";
@@ -80,12 +80,13 @@ export function PreviewCompareDock({
           type="button"
           variant="outline"
           size="sm"
-          className="h-7 px-2 text-xs"
-          title="JSON編集"
-          aria-label="JSON編集"
+          className="h-7 gap-1 px-2.5 text-xs"
+          title="ビジュアルビルダーで微調整"
+          aria-label="ビジュアルビルダーで微調整"
           onClick={onOpenInEditor}
         >
-          <Code2 className="size-3.5" />
+          <SlidersHorizontal className="size-3.5" />
+          微調整
         </Button>
       </div>
     </div>

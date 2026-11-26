@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Bot, RotateCcw, Settings, Settings2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -70,6 +70,7 @@ export function AssistantSidebar() {
     executeExpenseAction,
     handleDataMutated,
     handlePreviewA2UI,
+    consumePendingAssistantPrompt,
   } = useAssistantSidebar();
 
   const customizeHost = activePanel === "customize" ? dashboardHost : null;
@@ -79,7 +80,11 @@ export function AssistantSidebar() {
     ? `${preview.draft.name} (プレビュー中)`
     : (activeVersion?.name ?? (dashboardHost ? "v1" : undefined));
   const currentMessagesJson = dashboardHost
-    ? (preview?.draft?.messagesJson ?? activeVersion?.messagesJson ?? "[]")
+    ? (preview?.draft?.messagesJson ??
+      (dashboardHost.builder.isDirty && !dashboardHost.builder.jsonError
+        ? dashboardHost.builder.rawJson
+        : activeVersion?.messagesJson) ??
+      "[]")
     : undefined;
 
   const chat = useCodexChat({
@@ -89,6 +94,13 @@ export function AssistantSidebar() {
     onDataMutated: handleDataMutated,
     onPreviewA2UI: handlePreviewA2UI,
   });
+
+  useEffect(() => {
+    const prompt = consumePendingAssistantPrompt();
+    if (prompt && !chat.isStreaming) {
+      void chat.sendPrompt(prompt);
+    }
+  }, [consumePendingAssistantPrompt, chat]);
 
   const { codexStatus } = chat;
   const isConnected = codexStatus.state === "connected";

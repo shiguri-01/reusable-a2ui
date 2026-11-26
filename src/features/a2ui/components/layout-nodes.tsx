@@ -4,6 +4,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { resolveValue } from "../data-model";
 import type { A2UIComponent } from "../types";
+import { SortableCanvasContainer } from "./canvas-editor-chrome";
 import type { A2UIRenderContext } from "./render-context";
 
 type LayoutNode = Extract<
@@ -28,13 +29,15 @@ export function renderLayoutNode(
   depth: number,
   ctx: A2UIRenderContext,
 ): ReactNode {
-  const { mergedModel, compact, gapMap, gridMap, renderNode } = ctx;
+  const { mergedModel, compact, gapMap, gridMap, renderNode, editor } = ctx;
 
   switch (node.component) {
     case "Column": {
       return (
         <div key={node.id} className={cn("flex flex-col", gapMap[node.gap ?? "md"])}>
-          {node.children.map((childId) => renderNode(childId, depth + 1))}
+          <SortableCanvasContainer containerNode={node} editor={editor}>
+            {node.children.map((childId) => renderNode(childId, depth + 1, node))}
+          </SortableCanvasContainer>
         </div>
       );
     }
@@ -51,7 +54,9 @@ export function renderLayoutNode(
             node.wrap || compact ? "flex-wrap" : "flex-col sm:flex-row",
           )}
         >
-          {node.children.map((childId) => renderNode(childId, depth + 1))}
+          <SortableCanvasContainer containerNode={node} editor={editor}>
+            {node.children.map((childId) => renderNode(childId, depth + 1, node))}
+          </SortableCanvasContainer>
         </div>
       );
     }
@@ -62,7 +67,9 @@ export function renderLayoutNode(
           key={node.id}
           className={cn("grid", gridMap[node.columns ?? 2], gapMap[node.gap ?? "md"])}
         >
-          {node.children.map((childId) => renderNode(childId, depth + 1))}
+          <SortableCanvasContainer containerNode={node} editor={editor}>
+            {node.children.map((childId) => renderNode(childId, depth + 1, node))}
+          </SortableCanvasContainer>
         </div>
       );
     }
@@ -85,7 +92,9 @@ export function renderLayoutNode(
             </CardHeader>
           )}
           <CardContent className={cn("flex flex-col", compact ? "gap-3 px-3.5" : "gap-4")}>
-            {node.children.map((childId) => renderNode(childId, depth + 1))}
+            <SortableCanvasContainer containerNode={node} editor={editor}>
+              {node.children.map((childId) => renderNode(childId, depth + 1, node))}
+            </SortableCanvasContainer>
           </CardContent>
         </Card>
       );

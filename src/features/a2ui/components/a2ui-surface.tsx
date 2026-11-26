@@ -2,6 +2,7 @@ import { useId, type ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { buildSurfaceState, setByPath, type DataModel } from "../data-model";
 import type { A2UIAction, A2UIComponent, A2UIMessage } from "../types";
+import { A2UIEditableSurfaceRoot, SortableCanvasItem } from "./canvas-editor-chrome";
 import { renderDisplayNode } from "./display-nodes";
 import { renderExpenseNode } from "./expense-nodes";
 import { renderFormNode } from "./form-nodes";
@@ -12,6 +13,7 @@ import {
   GAP_CLASS,
   GRID_COLS_CLASS,
   type A2UIRenderContext,
+  type A2UISurfaceEditorProps,
 } from "./render-context";
 
 interface A2UISurfaceProps {
@@ -21,6 +23,7 @@ interface A2UISurfaceProps {
   onAction: (action: A2UIAction) => void;
   pending?: boolean;
   compact?: boolean;
+  editor?: A2UISurfaceEditorProps;
 }
 
 export function A2UISurface({
@@ -30,6 +33,7 @@ export function A2UISurface({
   onAction,
   pending = false,
   compact = false,
+  editor,
 }: A2UISurfaceProps) {
   const idPrefix = useId();
   const surface = buildSurfaceState(messages);
@@ -77,7 +81,7 @@ export function A2UISurface({
     }
   };
 
-  const renderNode = (id: string, depth = 0): ReactNode => {
+  const renderNode = (id: string, depth = 0, parent?: A2UIComponent): ReactNode => {
     if (depth > 20) return null;
     const node = surface.componentsById.get(id);
     if (!node) {
@@ -90,7 +94,23 @@ export function A2UISurface({
         </div>
       );
     }
-    return renderComponent(node, depth);
+
+    const rendered = renderComponent(node, depth);
+    if (!editor || id === surface.rootId) {
+      return rendered;
+    }
+
+    return (
+      <SortableCanvasItem
+        key={node.id}
+        node={node}
+        parent={parent}
+        dataModel={mergedModel}
+        editor={editor}
+      >
+        {rendered}
+      </SortableCanvasItem>
+    );
   };
 
   const ctx: A2UIRenderContext = {
@@ -103,11 +123,24 @@ export function A2UISurface({
     updatePath: (path, value) => onDataModelChange(setByPath(mergedModel, path, value)),
     onAction,
     renderNode,
+    editor,
   };
+
+  const rootContent = renderNode(surface.rootId);
 
   return (
     <div data-a2ui-surface={surface.surfaceId} data-a2ui-catalog={surface.catalogId}>
-      {renderNode(surface.rootId)}
+      {editor ? (
+        <A2UIEditableSurfaceRoot
+          rootId={surface.rootId}
+          componentsById={surface.componentsById}
+          editor={editor}
+        >
+          {rootContent}
+        </A2UIEditableSurfaceRoot>
+      ) : (
+        rootContent
+      )}
     </div>
   );
 }

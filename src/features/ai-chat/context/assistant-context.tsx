@@ -14,7 +14,8 @@ import type { DataModel } from "@/features/a2ui/data-model";
 import type { A2UIAction } from "@/features/a2ui/types";
 import type {
   CustomizePanelTab,
-  EditorDraft,
+  DashboardBuilderActions,
+  DashboardBuilderState,
 } from "@/features/dashboard/hooks/use-dashboard-controller";
 import { runExpenseA2UIAction, type ExpenseActionResult } from "@/features/expenses/actions";
 import { buildExpenseDataModel, type ExpenseItem } from "@/features/expenses/model";
@@ -24,11 +25,12 @@ type SidebarPanel = "ai" | "customize";
 
 export interface DashboardSidebarHost {
   customizeTab: CustomizePanelTab;
+  onChangeCustomizeTab: (tab: CustomizePanelTab) => void;
   uiVersions: UiVersion[];
   activeVersion: UiVersion | undefined;
   dataModel: DataModel;
   pending: boolean;
-  editorDraft: EditorDraft;
+  builder: DashboardBuilderState & DashboardBuilderActions;
   preview: {
     draft: AiPreviewDraft | null;
     compareMode: CompareMode;
@@ -39,11 +41,7 @@ export interface DashboardSidebarHost {
     onApply: (draft: AiPreviewDraft) => Promise<void>;
     onOpenInEditor: (messagesJson: string, suggestedName?: string) => void;
   };
-  onShowHistory: () => void;
-  onSwitchToEditor: () => void;
   onActivateVersion: (versionId: number) => void;
-  onEditorDraftChange: (patch: Partial<EditorDraft>) => void;
-  onSaveNewVersion: () => void;
   onExpenseAction: (
     action: A2UIAction,
     formValues: Record<string, unknown>,
@@ -69,6 +67,8 @@ interface AssistantSidebarContextValue {
   handleDataMutated: () => void;
   handlePreviewA2UI: (draft: AiPreviewDraft) => void;
   consumePendingPreviewDraft: () => AiPreviewDraft | null;
+  requestAssistantPrompt: (text: string) => void;
+  consumePendingAssistantPrompt: () => string | null;
 }
 
 const AssistantSidebarContext = createContext<AssistantSidebarContextValue | null>(null);
@@ -81,6 +81,7 @@ export function AssistantSidebarProvider({ children }: { children: ReactNode }) 
   const [pageExpenses, setPageExpenses] = useState<ExpenseItem[]>([]);
   const [pendingAction, setPendingAction] = useState(false);
   const [pendingPreviewDraft, setPendingPreviewDraft] = useState<AiPreviewDraft | null>(null);
+  const [pendingAssistantPrompt, setPendingAssistantPrompt] = useState<string | null>(null);
 
   const activePanel = dashboardHost ? selectedPanel : "ai";
   const visiblePanel = (isMobile ? openMobile : open) ? activePanel : null;
@@ -166,6 +167,23 @@ export function AssistantSidebarProvider({ children }: { children: ReactNode }) 
     return draft;
   }, [pendingPreviewDraft]);
 
+  const requestAssistantPrompt = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      setPendingAssistantPrompt(trimmed);
+      openPanel("ai");
+    },
+    [openPanel],
+  );
+
+  const consumePendingAssistantPrompt = useCallback(() => {
+    if (!pendingAssistantPrompt) return null;
+    const prompt = pendingAssistantPrompt;
+    setPendingAssistantPrompt(null);
+    return prompt;
+  }, [pendingAssistantPrompt]);
+
   const value = useMemo<AssistantSidebarContextValue>(
     () => ({
       currentPagePath: router.path,
@@ -183,6 +201,8 @@ export function AssistantSidebarProvider({ children }: { children: ReactNode }) 
       handleDataMutated,
       handlePreviewA2UI,
       consumePendingPreviewDraft,
+      requestAssistantPrompt,
+      consumePendingAssistantPrompt,
     }),
     [
       router.path,
@@ -198,6 +218,8 @@ export function AssistantSidebarProvider({ children }: { children: ReactNode }) 
       handleDataMutated,
       handlePreviewA2UI,
       consumePendingPreviewDraft,
+      requestAssistantPrompt,
+      consumePendingAssistantPrompt,
     ],
   );
 

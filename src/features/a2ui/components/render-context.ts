@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { DataModel } from "../data-model";
-import type { A2UIAction } from "../types";
+import type { A2UIAction, A2UIComponent } from "../types";
 
 export const GAP_CLASS = {
   sm: "gap-2",
@@ -28,6 +28,16 @@ export const COMPACT_GRID_COLS_CLASS = {
   4: "grid-cols-2",
 } as const;
 
+export interface A2UISurfaceEditorProps {
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
+  onMove: (activeId: string, targetParentId: string, targetIndex?: number) => void;
+  onMoveRelative: (nodeId: string, direction: "up" | "down") => void;
+  onDuplicate: (nodeId: string) => void;
+  onDelete: (nodeId: string) => void;
+  onRequestAdd: (parentId: string) => void;
+}
+
 export interface A2UIRenderContext {
   idPrefix: string;
   mergedModel: DataModel;
@@ -37,5 +47,6 @@ export interface A2UIRenderContext {
   gridMap: Record<1 | 2 | 3 | 4, string>;
   updatePath: (path: string, value: unknown) => void;
   onAction: (action: A2UIAction) => void;
-  renderNode: (id: string, depth: number) => ReactNode;
+  renderNode: (id: string, depth: number, parent?: A2UIComponent) => ReactNode;
+  editor?: A2UISurfaceEditorProps;
 }

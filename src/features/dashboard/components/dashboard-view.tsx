@@ -5,8 +5,10 @@ import {
   useSyncAssistantExpenses,
 } from "@/features/ai-chat/context/assistant-context";
 import type { ExpenseItem } from "@/features/expenses/model";
-import { useDashboardController } from "../hooks/use-dashboard-controller";
+import { useDashboardController, type CustomizePanelTab } from "../hooks/use-dashboard-controller";
+import { BlockPaletteDialog } from "./block-palette-dialog";
 import { DashboardCanvas } from "./dashboard-canvas";
+import { SaveVersionDialog } from "./save-version-dialog";
 
 interface DashboardViewProps {
   expenses: ExpenseItem[];
@@ -15,9 +17,20 @@ interface DashboardViewProps {
 }
 
 export function DashboardView({ expenses, uiVersions, activeVersionId }: DashboardViewProps) {
-  const controller = useDashboardController({ expenses, uiVersions, activeVersionId });
-  const { setDashboardHost, consumePendingPreviewDraft, visiblePanel, openPanel } =
-    useAssistantSidebar();
+  const {
+    setDashboardHost,
+    consumePendingPreviewDraft,
+    requestAssistantPrompt,
+    visiblePanel,
+    openPanel,
+  } = useAssistantSidebar();
+
+  const controller = useDashboardController({
+    expenses,
+    uiVersions,
+    activeVersionId,
+    onSendPromptToAssistant: requestAssistantPrompt,
+  });
   const controllerRef = useRef(controller);
 
   // Keep sidebar callbacks tied to the latest committed controller state.
@@ -37,11 +50,12 @@ export function DashboardView({ expenses, uiVersions, activeVersionId }: Dashboa
   useEffect(() => {
     setDashboardHost({
       customizeTab: controller.customizeTab,
+      onChangeCustomizeTab: (tab) => controllerRef.current.setCustomizeTab(tab),
       uiVersions,
       activeVersion: controller.activeVersion,
       dataModel: controller.dataModel,
       pending: controller.pending,
-      editorDraft: controller.editorDraft,
+      builder: controller.builder,
       preview: {
         draft: controller.previewDraft,
         compareMode: controller.compareMode,
@@ -55,11 +69,7 @@ export function DashboardView({ expenses, uiVersions, activeVersionId }: Dashboa
           openPanel("customize");
         },
       },
-      onShowHistory: () => controllerRef.current.setCustomizeTab("history"),
-      onSwitchToEditor: () => controllerRef.current.handleSwitchToEditor(),
       onActivateVersion: (id) => void controllerRef.current.handleActivateVersion(id),
-      onEditorDraftChange: (patch) => controllerRef.current.updateEditorDraft(patch),
-      onSaveNewVersion: () => void controllerRef.current.handleSaveNewVersion(),
       onExpenseAction: (act, form) => controllerRef.current.executeExpenseAction(act, form),
     });
   }, [
@@ -67,7 +77,7 @@ export function DashboardView({ expenses, uiVersions, activeVersionId }: Dashboa
     controller.activeVersion,
     controller.dataModel,
     controller.pending,
-    controller.editorDraft,
+    controller.builder,
     controller.previewDraft,
     controller.compareMode,
     controller.appliedDraftIds,
@@ -82,19 +92,49 @@ export function DashboardView({ expenses, uiVersions, activeVersionId }: Dashboa
     };
   }, [setDashboardHost]);
 
+  const handleOpenCustomize = (tab?: CustomizePanelTab) => {
+    if (tab) {
+      controller.setCustomizeTab(tab);
+    }
+    openPanel("customize");
+  };
+
   return (
-    <DashboardCanvas
-      activeVersion={controller.activeVersion}
-      messages={controller.messages}
-      dataModel={controller.dataModel}
-      pending={controller.pending}
-      feedback={controller.feedback}
-      previewDraft={controller.previewDraft}
-      compareMode={controller.compareMode}
-      isCustomizeOpen={visiblePanel === "customize"}
-      onOpenCustomize={() => openPanel("customize")}
-      onDataModelChange={controller.handleDataModelChange}
-      onAction={(act) => void controller.handleAction(act)}
-    />
+    <>
+      <DashboardCanvas
+        activeVersion={controller.activeVersion}
+        messages={controller.messages}
+        dataModel={controller.dataModel}
+        pending={controller.pending}
+        feedback={controller.feedback}
+        previewDraft={controller.previewDraft}
+        compareMode={controller.compareMode}
+        isCustomizeOpen={visiblePanel === "customize"}
+        customizeTab={controller.customizeTab}
+        builder={controller.builder}
+        onOpenCustomize={handleOpenCustomize}
+        onDataModelChange={controller.handleDataModelChange}
+        onAction={(act) => void controller.handleAction(act)}
+      />
+
+      <BlockPaletteDialog
+        open={controller.builder.paletteOpen}
+        onOpenChange={controller.builder.setPaletteOpen}
+        graph={controller.builder.graph}
+        dataModel={controller.dataModel}
+        defaultParentId={controller.builder.paletteTargetParentId}
+        onInsertBlock={(blueprint, parentId) => controller.builder.insertBlock(blueprint, parentId)}
+      />
+
+      <SaveVersionDialog
+        open={controller.builder.saveDialogOpen}
+        onOpenChange={controller.builder.setSaveDialogOpen}
+        defaultName={controller.builder.suggestedVersionName}
+        defaultDescription={controller.builder.suggestedDescription}
+        pending={controller.pending}
+        serverError={controller.builder.saveServerError}
+        onSubmit={controller.builder.saveAsNewVersion}
+      />
+    </>
   );
 }
