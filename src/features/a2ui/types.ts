@@ -74,12 +74,20 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
     max: boundNumberSchema.optional(),
     detail: boundStringSchema.optional(),
   }),
-  z.object({
-    id: z.string().min(1),
-    component: z.literal("CategoryBreakdown"),
-    dataPath: z.string(),
-    emptyText: z.string().optional(),
-  }),
+  z
+    .object({
+      id: z.string().min(1),
+      component: z.literal("CategoryBreakdown"),
+      dataPath: z.string(),
+      emptyText: z.string().optional(),
+      detailsPeriod: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe("集計の年月・日付範囲・「全期間」。指定するとチャット内の各行から明細を開ける。"),
+    })
+    .describe("カテゴリ別の支出額と構成比を金額順の横棒で比較する。"),
   z.object({
     id: z.string().min(1),
     component: z.literal("FilterChips"),
@@ -122,7 +130,9 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
     component: z.literal("Button"),
     label: z.string(),
     variant: z.enum(["default", "secondary", "outline", "destructive", "ghost"]).optional(),
-    action: a2uiActionSchema,
+    action: a2uiActionSchema.describe(
+      "createExpense はフォームの支出を登録する。sendPrompt は payload.text をチャットに送る。",
+    ),
     fullWidth: z.boolean().optional(),
   }),
   z.object({
@@ -133,7 +143,10 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
     showCategory: z.boolean().optional(),
     showDate: z.boolean().optional(),
     showNote: z.boolean().optional(),
-    allowDelete: z.boolean().optional(),
+    allowDelete: z
+      .boolean()
+      .optional()
+      .describe("削除が依頼の目的に含まれる場合に、各明細に削除ボタンを表示する。"),
     emptyText: z.string().optional(),
     limit: z.number().int().positive().optional(),
   }),

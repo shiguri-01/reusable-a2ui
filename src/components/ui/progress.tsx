@@ -6,27 +6,30 @@ function Progress({
   value = 0,
   indicatorClassName,
   ...props
-}: React.ComponentProps<"div"> & {
+}: React.ComponentProps<"span"> & {
   value?: number;
   indicatorClassName?: string;
 }) {
   const clamped = Math.max(0, Math.min(100, value));
   return (
-    <div
+    <span
       role="progressbar"
       aria-valuenow={clamped}
       aria-valuemin={0}
       aria-valuemax={100}
       data-slot="progress"
-      className={cn("bg-primary/15 relative h-2.5 w-full overflow-hidden rounded-full", className)}
+      className={cn(
+        "bg-primary/15 relative block h-2.5 w-full overflow-hidden rounded-full",
+        className,
+      )}
       {...props}
     >
-      <div
+      <span
         data-slot="progress-indicator"
-        className={cn("bg-primary h-full transition-all duration-300", indicatorClassName)}
+        className={cn("bg-primary block h-full transition-all duration-300", indicatorClassName)}
         style={{ width: `${clamped}%` }}
       />
-    </div>
+    </span>
   );
 }
 

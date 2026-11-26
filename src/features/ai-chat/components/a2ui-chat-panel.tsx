@@ -130,7 +130,7 @@ export function A2UIChatPanel({
                   key={message.id}
                   message={message}
                   dataModel={dataModel}
-                  pending={saving}
+                  pending={saving || isStreaming}
                   isStreamingThis={
                     message.role === "assistant" && index === messages.length - 1 && isStreaming
                   }
@@ -138,7 +138,7 @@ export function A2UIChatPanel({
                   appliedDraftIds={appliedDraftIds}
                   editingDraftId={editingDraftId}
                   onExpenseAction={onExpenseAction}
-                  onSendPrompt={(text) => void handleSendText(text)}
+                  onSendPrompt={(text) => void sendPrompt(text)}
                   onPreview={onPreviewA2UI}
                 />
               ))
