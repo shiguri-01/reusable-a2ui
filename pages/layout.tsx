@@ -1,11 +1,13 @@
 import type { CSSProperties, ReactNode } from "react";
-import { Link, useRouter } from "@void/react";
+import { Link } from "@void/react";
 import { Layers, PanelRight, ReceiptText, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
-import { useSidebarWidth } from "@/features/dashboard/hooks/use-sidebar-width";
+import { SidebarInset, SidebarProvider, useSidebar } from "@/components/ui/sidebar";
+import { AssistantSidebar } from "@/features/ai-chat/components/assistant-sidebar";
+import { AssistantSidebarProvider } from "@/features/ai-chat/context/assistant-context";
+import { useSidebarWidth } from "@/features/ai-chat/hooks/use-sidebar-width";
 import { cn } from "@/lib/utils";
 import "./style.css";
 
@@ -34,8 +36,6 @@ function HeaderSidebarToggle() {
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {
-  const router = useRouter();
-  const isDashboard = router.path === "/";
   const sidebarWidth = useSidebarWidth();
 
   return (
@@ -49,53 +49,50 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         } as CSSProperties
       }
     >
-      <header className="bg-background/95 supports-backdrop-filter:bg-background/80 sticky top-0 z-30 border-b backdrop-blur">
-        <div className="flex h-14 items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-              <span className="bg-primary text-primary-foreground flex size-7 items-center justify-center rounded-md">
-                <Wallet className="size-4" />
-              </span>
-              <span>支出ログ</span>
-            </Link>
-            <Badge variant="secondary" className="hidden sm:inline-flex">
-              A2UI Demo
-            </Badge>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <nav className="flex items-center gap-1 text-sm">
-              <Link
-                href="/"
-                className="text-muted-foreground hover:bg-accent hover:text-foreground data-void-active:bg-accent data-void-active:text-foreground inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors"
-              >
-                <Layers className="size-4" />
-                <span>ダッシュボード (A2UI)</span>
+      <AssistantSidebarProvider>
+        <header className="bg-background/95 supports-backdrop-filter:bg-background/80 sticky top-0 z-30 border-b backdrop-blur">
+          <div className="flex h-14 items-center justify-between px-4 sm:px-6">
+            <div className="flex items-center gap-3">
+              <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
+                <span className="bg-primary text-primary-foreground flex size-7 items-center justify-center rounded-md">
+                  <Wallet className="size-4" />
+                </span>
+                <span>支出ログ</span>
               </Link>
-              <Link
-                href="/expenses"
-                className="text-muted-foreground hover:bg-accent hover:text-foreground data-void-active:bg-accent data-void-active:text-foreground inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors"
-              >
-                <ReceiptText className="size-4" />
-                <span>支出一覧</span>
-              </Link>
-            </nav>
+              <Badge variant="secondary" className="hidden sm:inline-flex">
+                A2UI Demo
+              </Badge>
+            </div>
 
-            {isDashboard && (
-              <>
-                <Separator orientation="vertical" className="h-5" />
-                <HeaderSidebarToggle />
-              </>
-            )}
+            <div className="flex items-center gap-2">
+              <nav className="flex items-center gap-1 text-sm">
+                <Link
+                  href="/"
+                  className="text-muted-foreground hover:bg-accent hover:text-foreground data-void-active:bg-accent data-void-active:text-foreground inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors"
+                >
+                  <Layers className="size-4" />
+                  <span>ダッシュボード (A2UI)</span>
+                </Link>
+                <Link
+                  href="/expenses"
+                  className="text-muted-foreground hover:bg-accent hover:text-foreground data-void-active:bg-accent data-void-active:text-foreground inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors"
+                >
+                  <ReceiptText className="size-4" />
+                  <span>支出一覧</span>
+                </Link>
+              </nav>
+
+              <Separator orientation="vertical" className="h-5" />
+              <HeaderSidebarToggle />
+            </div>
           </div>
+        </header>
+
+        <div className="flex min-h-[calc(100svh-3.5rem)] w-full flex-1">
+          <SidebarInset className="min-w-0 bg-transparent">{children}</SidebarInset>
+          <AssistantSidebar />
         </div>
-      </header>
-
-      {isDashboard ? (
-        <div className="flex min-h-[calc(100svh-3.5rem)] w-full flex-1">{children}</div>
-      ) : (
-        <main className="flex-1">{children}</main>
-      )}
+      </AssistantSidebarProvider>
     </SidebarProvider>
   );
 }

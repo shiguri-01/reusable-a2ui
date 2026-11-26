@@ -20,13 +20,15 @@ import type { AiPreviewDraft } from "../types";
 const STORAGE_KEY_WS_URL = "reusable-a2ui:codex-ws-url:v3";
 
 interface UseCodexChatOptions {
-  activeVersionName: string;
-  currentMessagesJson: string;
+  currentPagePath?: string;
+  activeVersionName?: string;
+  currentMessagesJson?: string;
   onDataMutated: (toolName: string) => void;
   onPreviewA2UI: (draft: AiPreviewDraft) => void;
 }
 
 export function useCodexChat({
+  currentPagePath,
   activeVersionName,
   currentMessagesJson,
   onDataMutated,
@@ -37,6 +39,7 @@ export function useCodexChat({
   const [autoApproveSession, setAutoApproveSession] = useState(false);
 
   const transportCallbacksRef = useRef({
+    currentPagePath,
     activeVersionName,
     currentMessagesJson,
     onDataMutated,
@@ -45,12 +48,13 @@ export function useCodexChat({
 
   useEffect(() => {
     transportCallbacksRef.current = {
+      currentPagePath,
       activeVersionName,
       currentMessagesJson,
       onDataMutated,
       onPreviewA2UI,
     };
-  }, [activeVersionName, currentMessagesJson, onDataMutated, onPreviewA2UI]);
+  }, [currentPagePath, activeVersionName, currentMessagesJson, onDataMutated, onPreviewA2UI]);
 
   const client = useMemo(() => new CodexAppServerClient(DEFAULT_CODEX_WS_URL), []);
 
@@ -127,6 +131,7 @@ export function useCodexChat({
         formatUserPrompt: (userText) =>
           buildUserTurnPrompt({
             userText,
+            currentPagePath: transportCallbacksRef.current.currentPagePath,
             activeVersionName: transportCallbacksRef.current.activeVersionName,
             currentMessagesJson: transportCallbacksRef.current.currentMessagesJson,
           }),

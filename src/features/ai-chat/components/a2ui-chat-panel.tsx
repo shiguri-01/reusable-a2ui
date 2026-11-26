@@ -6,10 +6,10 @@ import type { A2UIAction } from "@/features/a2ui/types";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { useCodexChat } from "../hooks/use-codex-chat";
+import type { useCodexChat } from "../hooks/use-codex-chat";
 import type { AiPreviewDraft, CompareMode } from "../types";
 import { ChatMessageItem } from "./chat-message-item";
-import { CodexConnectionBar } from "./codex-connection-bar";
+import { CodexOfflineBanner } from "./codex-connection-bar";
 import { McpApprovalCard } from "./mcp-approval-card";
 import { PreviewCompareDock } from "./preview-compare-dock";
 
@@ -22,34 +22,30 @@ const QUICK_PROMPTS = [
 ];
 
 interface A2UIChatPanelProps {
-  activeVersionName: string;
-  currentMessagesJson: string;
+  chat: ReturnType<typeof useCodexChat>;
   dataModel: DataModel;
   saving: boolean;
   previewDraft: AiPreviewDraft | null;
   compareMode: CompareMode;
   appliedDraftIds: Record<string, boolean>;
-  onDataMutated: (toolName: string) => void;
   onExpenseAction: (
     action: A2UIAction,
     formValues: Record<string, unknown>,
   ) => Promise<{ ok: boolean; message?: string }>;
   onPreviewA2UI: (draft: AiPreviewDraft) => void;
-  onChangeCompareMode: (mode: CompareMode) => void;
-  onDiscardPreview: () => void;
-  onApplyA2UI: (draft: AiPreviewDraft) => Promise<void>;
-  onOpenInEditor: (messagesJson: string, suggestedName?: string) => void;
+  onChangeCompareMode?: (mode: CompareMode) => void;
+  onDiscardPreview?: () => void;
+  onApplyA2UI?: (draft: AiPreviewDraft) => Promise<void>;
+  onOpenInEditor?: (messagesJson: string, suggestedName?: string) => void;
 }
 
 export function A2UIChatPanel({
-  activeVersionName,
-  currentMessagesJson,
+  chat,
   dataModel,
   saving,
   previewDraft,
   compareMode,
   appliedDraftIds,
-  onDataMutated,
   onExpenseAction,
   onPreviewA2UI,
   onChangeCompareMode,
@@ -57,12 +53,9 @@ export function A2UIChatPanel({
   onApplyA2UI,
   onOpenInEditor,
 }: A2UIChatPanelProps) {
-  const [showSettings, setShowSettings] = useState(false);
   const [input, setInput] = useState("");
 
   const {
-    wsUrlInput,
-    setWsUrlInput,
     codexStatus,
     messages,
     isStreaming,
@@ -74,15 +67,9 @@ export function A2UIChatPanel({
     approveElicitation,
     declineElicitation,
     connect,
-    resetChat,
     stopStreaming,
     sendPrompt,
-  } = useCodexChat({
-    activeVersionName,
-    currentMessagesJson,
-    onDataMutated,
-    onPreviewA2UI,
-  });
+  } = chat;
 
   const { scrollRef, contentRef, isAtBottom, scrollToBottom } = useStickToBottom();
 
@@ -91,13 +78,6 @@ export function A2UIChatPanel({
       void scrollToBottom();
     }
   }, [pendingElicitations.length, scrollToBottom]);
-
-  const handleConnect = async () => {
-    const ok = await connect();
-    if (ok) {
-      setShowSettings(false);
-    }
-  };
 
   const handleSendText = async (text: string) => {
     const trimmed = text.trim();
@@ -115,16 +95,7 @@ export function A2UIChatPanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <CodexConnectionBar
-        status={codexStatus}
-        wsUrlInput={wsUrlInput}
-        showSettings={showSettings}
-        hasMessages={messages.length > 0}
-        onWsUrlChange={setWsUrlInput}
-        onToggleSettings={() => setShowSettings((prev) => !prev)}
-        onConnect={() => void handleConnect()}
-        onResetChat={resetChat}
-      />
+      <CodexOfflineBanner status={codexStatus} onReconnect={() => void connect()} />
 
       {/* Conversation */}
       <div className="relative min-h-0 flex-1">
@@ -211,7 +182,7 @@ export function A2UIChatPanel({
         )}
       </div>
 
-      {previewDraft && (
+      {previewDraft && onChangeCompareMode && onApplyA2UI && onOpenInEditor && onDiscardPreview && (
         <PreviewCompareDock
           compareMode={compareMode}
           saving={saving}

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { action } from "@void/react";
+import { useSyncAssistantExpenses } from "@/features/ai-chat/context/assistant-context";
 import { ALL_CATEGORY_LABEL, formatYen, type ExpenseItem } from "../model";
 import { ExpenseCreateDialog } from "./expense-create-dialog";
 import { ExpenseTable } from "./expense-table";
@@ -9,6 +10,7 @@ interface ExpensesViewProps {
 }
 
 export function ExpensesView({ expenses }: ExpensesViewProps) {
+  useSyncAssistantExpenses(expenses);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState(ALL_CATEGORY_LABEL);
   const [pendingId, setPendingId] = useState<number | null>(null);
@@ -41,7 +43,7 @@ export function ExpensesView({ expenses }: ExpensesViewProps) {
   };
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
+    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">支出一覧</h1>

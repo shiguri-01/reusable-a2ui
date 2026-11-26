@@ -1,30 +1,27 @@
 import { useMemo, useState } from "react";
-import { action, useRouter } from "@void/react";
+import { action } from "@void/react";
 import type { UiVersion } from "@schema";
 import { getByPath, type DataModel } from "@/features/a2ui/data-model";
 import { a2uiMessagesSchema, type A2UIAction, type A2UIMessage } from "@/features/a2ui/types";
+import type {
+  AssistantSidebarTab,
+  DashboardEditorDraft,
+} from "@/features/ai-chat/context/assistant-context";
 import type { AiPreviewDraft, CompareMode } from "@/features/ai-chat/types";
+import { runExpenseA2UIAction, type ExpenseActionResult } from "@/features/expenses/actions";
 import {
   ALL_CATEGORY_LABEL,
   buildExpenseDataModel,
   createInitialExpenseForm,
-  EXPENSE_CATEGORIES,
-  getTodayIso,
   type ExpenseItem,
 } from "@/features/expenses/model";
-import type { DashboardSidebarTab } from "../components/dashboard-sidebar";
 
 export interface DashboardFeedback {
   type: "error" | "success";
   message: string;
 }
 
-export interface EditorDraft {
-  name: string;
-  description: string;
-  json: string;
-  error: string | null;
-}
+export type EditorDraft = DashboardEditorDraft;
 
 function parseMessages(json: string): A2UIMessage[] {
   try {
@@ -46,7 +43,6 @@ export function useDashboardController({
   uiVersions,
   activeVersionId,
 }: UseDashboardControllerOptions) {
-  const router = useRouter();
   const activeVersion =
     uiVersions.find((v) => v.id === activeVersionId) ?? uiVersions[uiVersions.length - 1];
 
@@ -59,7 +55,7 @@ export function useDashboardController({
   const [pending, setPending] = useState(false);
   const [feedback, setFeedback] = useState<DashboardFeedback | null>(null);
 
-  const [panelTab, setPanelTab] = useState<DashboardSidebarTab>("ai");
+  const [panelTab, setPanelTab] = useState<AssistantSidebarTab>("ai");
   const [editorDraft, setEditorDraft] = useState<EditorDraft>(() => ({
     name: `v${uiVersions.length + 1}：カスタム定義`,
     description: "",
@@ -103,60 +99,13 @@ export function useDashboardController({
   const executeExpenseAction = async (
     act: A2UIAction,
     sourceForm: Record<string, unknown>,
-  ): Promise<{ ok: boolean; message?: string }> => {
-    if (act.name === "createExpense") {
-      const title = String(sourceForm.title ?? "").trim();
-      const amount = Number(sourceForm.amount);
-      const category = String(sourceForm.category ?? EXPENSE_CATEGORIES[0]);
-      const spentAt = String(sourceForm.spentAt ?? getTodayIso()) || getTodayIso();
-      const note = String(sourceForm.note ?? "").trim();
-
-      if (!title) {
-        return { ok: false, message: "内容を入力してください。" };
-      }
-      if (!Number.isFinite(amount) || amount <= 0) {
-        return { ok: false, message: "金額は1円以上の数値で入力してください。" };
-      }
-
-      setPending(true);
-      try {
-        const res = await action("/?createExpense", {
-          data: {
-            title,
-            amount: Math.round(amount),
-            category,
-            spentAt,
-            note,
-          },
-        });
-        if (!res.ok) {
-          return { ok: false, message: res.error.message };
-        }
-        return { ok: true, message: `「${title}」を記録しました。` };
-      } finally {
-        setPending(false);
-      }
+  ): Promise<ExpenseActionResult> => {
+    setPending(true);
+    try {
+      return await runExpenseA2UIAction(act, sourceForm, "dashboard");
+    } finally {
+      setPending(false);
     }
-
-    if (act.name === "deleteExpense") {
-      const id = Number(act.payload?.id);
-      if (!Number.isInteger(id) || id <= 0) return { ok: false };
-
-      setPending(true);
-      try {
-        const res = await action("/?deleteExpense", {
-          data: { id },
-        });
-        if (!res.ok) {
-          return { ok: false, message: res.error.message };
-        }
-        return { ok: true, message: "支出ログを削除しました。" };
-      } finally {
-        setPending(false);
-      }
-    }
-
-    return { ok: false };
   };
 
   const handleAction = async (act: A2UIAction) => {
@@ -268,10 +217,6 @@ export function useDashboardController({
     setPanelTab("editor");
   };
 
-  const handleDataMutated = () => {
-    void router.refresh();
-  };
-
   return {
     activeVersion,
     messages,
@@ -296,6 +241,5 @@ export function useDashboardController({
     handleApplyAiVersion,
     handleOpenAiJsonInEditor,
     handleDiscardPreview: () => setPreviewDraft(null),
-    handleDataMutated,
   };
 }

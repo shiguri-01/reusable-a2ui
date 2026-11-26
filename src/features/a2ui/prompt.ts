@@ -80,18 +80,26 @@ export function buildA2UIDeveloperInstructions(): string {
 
 export function buildUserTurnPrompt(options: {
   userText: string;
-  activeVersionName: string;
-  currentMessagesJson: string;
+  currentPagePath?: string;
+  activeVersionName?: string;
+  currentMessagesJson?: string;
 }): string {
-  return [
-    `今日の日付: ${getTodayIso()}`,
-    `現在使用中の UI バージョン: ${options.activeVersionName}`,
-    "現在のダッシュボード A2UI JSON:",
-    "```json",
-    options.currentMessagesJson,
-    "```",
-    "",
-    "ユーザーからの依頼:",
-    options.userText,
-  ].join("\n");
+  const lines = [`今日の日付: ${getTodayIso()}`];
+
+  if (options.currentPagePath) {
+    lines.push(`現在のページ: ${options.currentPagePath}`);
+  }
+
+  if (options.activeVersionName && options.currentMessagesJson) {
+    lines.push(
+      `現在使用中の UI バージョン: ${options.activeVersionName}`,
+      "現在のダッシュボード A2UI JSON:",
+      "```json",
+      options.currentMessagesJson,
+      "```",
+    );
+  }
+
+  lines.push("", "ユーザーからの依頼:", options.userText);
+  return lines.join("\n");
 }
