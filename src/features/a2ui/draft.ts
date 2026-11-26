@@ -28,10 +28,7 @@ export function extractDashboardDraft(draftId: string, output: unknown): Dashboa
     draftId,
     name,
     description,
-    messagesJson:
-      typeof record.messagesJson === "string"
-        ? record.messagesJson
-        : JSON.stringify(validated.messages, null, 2),
+    messagesJson: JSON.stringify(validated.messages, null, 2),
     messages: validated.messages,
   };
 }
