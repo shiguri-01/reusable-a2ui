@@ -50,8 +50,6 @@ export interface DashboardSidebarHost {
 interface AssistantSidebarContextValue {
   currentPagePath: string;
   dashboardHost: DashboardSidebarHost | null;
-  setDashboardHost: (host: DashboardSidebarHost | null) => void;
-  setPageExpenses: (expenses: ExpenseItem[]) => void;
   activePanel: SidebarPanel;
   visiblePanel: SidebarPanel | null;
   openPanel: (panel: SidebarPanel) => void;
@@ -66,12 +64,21 @@ interface AssistantSidebarContextValue {
   handleDataMutated: () => void;
   handlePreviewA2UI: (draft: AiPreviewDraft) => void;
   handleDashboardProposed: (draft: AiPreviewDraft, base?: DashboardEditBase) => void;
-  consumePendingPreviewDraft: () => AiPreviewDraft | null;
-  requestAssistantPrompt: (text: string) => void;
   consumePendingAssistantPrompt: () => string | null;
 }
 
+interface AssistantPageContextValue {
+  setDashboardHost: (host: DashboardSidebarHost | null) => void;
+  setPageExpenses: (expenses: ExpenseItem[]) => void;
+  visiblePanel: SidebarPanel | null;
+  openPanel: (panel: SidebarPanel) => void;
+  closePanel: () => void;
+  consumePendingPreviewDraft: () => AiPreviewDraft | null;
+  requestAssistantPrompt: (text: string) => void;
+}
+
 const AssistantSidebarContext = createContext<AssistantSidebarContextValue | null>(null);
+const AssistantPageContext = createContext<AssistantPageContextValue | null>(null);
 
 export function AssistantSidebarProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -195,12 +202,24 @@ export function AssistantSidebarProvider({ children }: { children: ReactNode }) 
     return prompt;
   }, [pendingAssistantPrompt]);
 
+  // Pages publish data to the sidebar without subscribing to the data they publish.
+  const pageValue = useMemo<AssistantPageContextValue>(
+    () => ({
+      setDashboardHost,
+      setPageExpenses,
+      visiblePanel,
+      openPanel,
+      closePanel,
+      consumePendingPreviewDraft,
+      requestAssistantPrompt,
+    }),
+    [visiblePanel, openPanel, closePanel, consumePendingPreviewDraft, requestAssistantPrompt],
+  );
+
   const value = useMemo<AssistantSidebarContextValue>(
     () => ({
       currentPagePath: router.path,
       dashboardHost,
-      setDashboardHost,
-      setPageExpenses,
       activePanel,
       visiblePanel,
       openPanel,
@@ -212,8 +231,6 @@ export function AssistantSidebarProvider({ children }: { children: ReactNode }) 
       handleDataMutated,
       handlePreviewA2UI,
       handleDashboardProposed,
-      consumePendingPreviewDraft,
-      requestAssistantPrompt,
       consumePendingAssistantPrompt,
     }),
     [
@@ -230,14 +247,14 @@ export function AssistantSidebarProvider({ children }: { children: ReactNode }) 
       handleDataMutated,
       handlePreviewA2UI,
       handleDashboardProposed,
-      consumePendingPreviewDraft,
-      requestAssistantPrompt,
       consumePendingAssistantPrompt,
     ],
   );
 
   return (
-    <AssistantSidebarContext.Provider value={value}>{children}</AssistantSidebarContext.Provider>
+    <AssistantPageContext.Provider value={pageValue}>
+      <AssistantSidebarContext.Provider value={value}>{children}</AssistantSidebarContext.Provider>
+    </AssistantPageContext.Provider>
   );
 }
 
@@ -249,8 +266,16 @@ export function useAssistantSidebar(): AssistantSidebarContextValue {
   return ctx;
 }
 
+export function useAssistantPage(): AssistantPageContextValue {
+  const ctx = useContext(AssistantPageContext);
+  if (!ctx) {
+    throw new Error("useAssistantPage must be used within AssistantSidebarProvider");
+  }
+  return ctx;
+}
+
 export function useSyncAssistantExpenses(expenses: ExpenseItem[]) {
-  const { setPageExpenses } = useAssistantSidebar();
+  const { setPageExpenses } = useAssistantPage();
   useEffect(() => {
     setPageExpenses(expenses);
   }, [expenses, setPageExpenses]);

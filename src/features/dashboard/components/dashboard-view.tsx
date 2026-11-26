@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { UiVersion } from "@schema";
 import {
-  useAssistantSidebar,
+  useAssistantPage,
   useSyncAssistantExpenses,
 } from "@/features/ai-chat/context/assistant-context";
 import type { ExpenseItem } from "@/features/expenses/model";
@@ -29,7 +29,7 @@ export function DashboardView({ expenses, uiVersions, activeVersionId }: Dashboa
     visiblePanel,
     openPanel,
     closePanel,
-  } = useAssistantSidebar();
+  } = useAssistantPage();
   const [editing, setEditing] = useState(false);
   const isEditing = editing || visiblePanel === "customize";
 
