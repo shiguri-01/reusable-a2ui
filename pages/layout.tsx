@@ -1,39 +1,15 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Link } from "@void/react";
-import { Layers, PanelRight, ReceiptText, Wallet } from "lucide-react";
+import { Layers, ReceiptText, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { SidebarInset, SidebarProvider, useSidebar } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AssistantSidebar } from "@/features/ai-chat/components/assistant-sidebar";
 import { AssistantSidebarProvider } from "@/features/ai-chat/context/assistant-context";
 import { useSidebarWidth } from "@/features/ai-chat/hooks/use-sidebar-width";
-import { cn } from "@/lib/utils";
 import "./style.css";
 
-function HeaderSidebarToggle() {
-  const { open, openMobile, isMobile, toggleSidebar } = useSidebar();
-  const isOpen = isMobile ? openMobile : open;
-
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      className={cn(
-        "gap-1.5 text-xs",
-        isOpen ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
-      )}
-      aria-label={isOpen ? "AI アシスタントを閉じる" : "AI アシスタントを開く"}
-      aria-expanded={isOpen}
-      title="AI アシスタントを開閉 (Ctrl+B)"
-      onClick={toggleSidebar}
-    >
-      <PanelRight className="size-4" />
-      <span className="hidden sm:inline">AI アシスタント</span>
-    </Button>
-  );
-}
+const navLinkClass =
+  "text-muted-foreground hover:bg-accent hover:text-foreground data-void-active:bg-accent data-void-active:text-foreground inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors";
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const sidebarWidth = useSidebarWidth();
@@ -64,27 +40,16 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               </Badge>
             </div>
 
-            <div className="flex items-center gap-2">
-              <nav className="flex items-center gap-1 text-sm">
-                <Link
-                  href="/"
-                  className="text-muted-foreground hover:bg-accent hover:text-foreground data-void-active:bg-accent data-void-active:text-foreground inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors"
-                >
-                  <Layers className="size-4" />
-                  <span>ダッシュボード (A2UI)</span>
-                </Link>
-                <Link
-                  href="/expenses"
-                  className="text-muted-foreground hover:bg-accent hover:text-foreground data-void-active:bg-accent data-void-active:text-foreground inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors"
-                >
-                  <ReceiptText className="size-4" />
-                  <span>支出一覧</span>
-                </Link>
-              </nav>
-
-              <Separator orientation="vertical" className="h-5" />
-              <HeaderSidebarToggle />
-            </div>
+            <nav className="flex items-center gap-1 text-sm">
+              <Link href="/" className={navLinkClass}>
+                <Layers className="size-4" />
+                <span>ダッシュボード (A2UI)</span>
+              </Link>
+              <Link href="/expenses" className={navLinkClass}>
+                <ReceiptText className="size-4" />
+                <span>支出一覧</span>
+              </Link>
+            </nav>
           </div>
         </header>
 

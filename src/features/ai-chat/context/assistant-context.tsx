@@ -9,28 +9,26 @@ import {
 } from "react";
 import { useRouter } from "@void/react";
 import type { UiVersion } from "@schema";
+import { useSidebar } from "@/components/ui/sidebar";
 import type { DataModel } from "@/features/a2ui/data-model";
 import type { A2UIAction } from "@/features/a2ui/types";
+import type {
+  CustomizePanelTab,
+  EditorDraft,
+} from "@/features/dashboard/hooks/use-dashboard-controller";
 import { runExpenseA2UIAction, type ExpenseActionResult } from "@/features/expenses/actions";
 import { buildExpenseDataModel, type ExpenseItem } from "@/features/expenses/model";
 import type { AiPreviewDraft, CompareMode } from "../types";
 
-export type AssistantSidebarTab = "ai" | "history" | "editor";
-
-export interface DashboardEditorDraft {
-  name: string;
-  description: string;
-  json: string;
-  error: string | null;
-}
+type SidebarPanel = "ai" | "customize";
 
 export interface DashboardSidebarHost {
-  panelTab: AssistantSidebarTab;
+  customizeTab: CustomizePanelTab;
   uiVersions: UiVersion[];
   activeVersion: UiVersion | undefined;
   dataModel: DataModel;
   pending: boolean;
-  editorDraft: DashboardEditorDraft;
+  editorDraft: EditorDraft;
   preview: {
     draft: AiPreviewDraft | null;
     compareMode: CompareMode;
@@ -41,10 +39,10 @@ export interface DashboardSidebarHost {
     onApply: (draft: AiPreviewDraft) => Promise<void>;
     onOpenInEditor: (messagesJson: string, suggestedName?: string) => void;
   };
-  onSelectTab: (tab: AssistantSidebarTab) => void;
+  onShowHistory: () => void;
   onSwitchToEditor: () => void;
   onActivateVersion: (versionId: number) => void;
-  onEditorDraftChange: (patch: Partial<DashboardEditorDraft>) => void;
+  onEditorDraftChange: (patch: Partial<EditorDraft>) => void;
   onSaveNewVersion: () => void;
   onExpenseAction: (
     action: A2UIAction,
@@ -57,6 +55,11 @@ interface AssistantSidebarContextValue {
   dashboardHost: DashboardSidebarHost | null;
   setDashboardHost: (host: DashboardSidebarHost | null) => void;
   setPageExpenses: (expenses: ExpenseItem[]) => void;
+  activePanel: SidebarPanel;
+  visiblePanel: SidebarPanel | null;
+  openPanel: (panel: SidebarPanel) => void;
+  togglePanel: (panel: SidebarPanel) => void;
+  closePanel: () => void;
   dataModel: DataModel;
   pending: boolean;
   executeExpenseAction: (
@@ -72,10 +75,55 @@ const AssistantSidebarContext = createContext<AssistantSidebarContextValue | nul
 
 export function AssistantSidebarProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const { open, openMobile, isMobile, setOpen, setOpenMobile } = useSidebar();
   const [dashboardHost, setDashboardHost] = useState<DashboardSidebarHost | null>(null);
+  const [selectedPanel, setSelectedPanel] = useState<SidebarPanel>("ai");
   const [pageExpenses, setPageExpenses] = useState<ExpenseItem[]>([]);
   const [pendingAction, setPendingAction] = useState(false);
   const [pendingPreviewDraft, setPendingPreviewDraft] = useState<AiPreviewDraft | null>(null);
+
+  const activePanel = dashboardHost ? selectedPanel : "ai";
+  const visiblePanel = (isMobile ? openMobile : open) ? activePanel : null;
+
+  useEffect(() => {
+    if (!dashboardHost && selectedPanel === "customize") {
+      setSelectedPanel("ai");
+    }
+  }, [dashboardHost, selectedPanel]);
+
+  const setSidebarOpen = useCallback(
+    (next: boolean) => {
+      if (isMobile) {
+        setOpenMobile(next);
+      } else {
+        setOpen(next);
+      }
+    },
+    [isMobile, setOpen, setOpenMobile],
+  );
+
+  const openPanel = useCallback(
+    (panel: SidebarPanel) => {
+      setSelectedPanel(panel);
+      setSidebarOpen(true);
+    },
+    [setSidebarOpen],
+  );
+
+  const closePanel = useCallback(() => {
+    setSidebarOpen(false);
+  }, [setSidebarOpen]);
+
+  const togglePanel = useCallback(
+    (panel: SidebarPanel) => {
+      if (visiblePanel === panel) {
+        closePanel();
+      } else {
+        openPanel(panel);
+      }
+    },
+    [visiblePanel, closePanel, openPanel],
+  );
 
   const fallbackDataModel = useMemo(() => buildExpenseDataModel(pageExpenses), [pageExpenses]);
 
@@ -124,6 +172,11 @@ export function AssistantSidebarProvider({ children }: { children: ReactNode }) 
       dashboardHost,
       setDashboardHost,
       setPageExpenses,
+      activePanel,
+      visiblePanel,
+      openPanel,
+      togglePanel,
+      closePanel,
       dataModel: dashboardHost?.dataModel ?? fallbackDataModel,
       pending: (dashboardHost?.pending ?? false) || pendingAction,
       executeExpenseAction: dashboardHost?.onExpenseAction ?? executeFallbackExpenseAction,
@@ -134,6 +187,11 @@ export function AssistantSidebarProvider({ children }: { children: ReactNode }) 
     [
       router.path,
       dashboardHost,
+      activePanel,
+      visiblePanel,
+      openPanel,
+      togglePanel,
+      closePanel,
       fallbackDataModel,
       pendingAction,
       executeFallbackExpenseAction,

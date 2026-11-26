@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import type { UiVersion } from "@schema";
 import {
   useAssistantSidebar,
@@ -16,9 +16,14 @@ interface DashboardViewProps {
 
 export function DashboardView({ expenses, uiVersions, activeVersionId }: DashboardViewProps) {
   const controller = useDashboardController({ expenses, uiVersions, activeVersionId });
-  const { setDashboardHost, consumePendingPreviewDraft } = useAssistantSidebar();
+  const { setDashboardHost, consumePendingPreviewDraft, visiblePanel, openPanel } =
+    useAssistantSidebar();
   const controllerRef = useRef(controller);
-  controllerRef.current = controller;
+
+  // Keep sidebar callbacks tied to the latest committed controller state.
+  useLayoutEffect(() => {
+    controllerRef.current = controller;
+  });
 
   useSyncAssistantExpenses(expenses);
 
@@ -31,7 +36,7 @@ export function DashboardView({ expenses, uiVersions, activeVersionId }: Dashboa
 
   useEffect(() => {
     setDashboardHost({
-      panelTab: controller.panelTab,
+      customizeTab: controller.customizeTab,
       uiVersions,
       activeVersion: controller.activeVersion,
       dataModel: controller.dataModel,
@@ -45,9 +50,12 @@ export function DashboardView({ expenses, uiVersions, activeVersionId }: Dashboa
         onChangeCompareMode: (mode) => controllerRef.current.setCompareMode(mode),
         onDiscard: () => controllerRef.current.handleDiscardPreview(),
         onApply: (draft) => controllerRef.current.handleApplyAiVersion(draft),
-        onOpenInEditor: (json, name) => controllerRef.current.handleOpenAiJsonInEditor(json, name),
+        onOpenInEditor: (json, name) => {
+          controllerRef.current.handleOpenAiJsonInEditor(json, name);
+          openPanel("customize");
+        },
       },
-      onSelectTab: (tab) => controllerRef.current.setPanelTab(tab),
+      onShowHistory: () => controllerRef.current.setCustomizeTab("history"),
       onSwitchToEditor: () => controllerRef.current.handleSwitchToEditor(),
       onActivateVersion: (id) => void controllerRef.current.handleActivateVersion(id),
       onEditorDraftChange: (patch) => controllerRef.current.updateEditorDraft(patch),
@@ -55,7 +63,7 @@ export function DashboardView({ expenses, uiVersions, activeVersionId }: Dashboa
       onExpenseAction: (act, form) => controllerRef.current.executeExpenseAction(act, form),
     });
   }, [
-    controller.panelTab,
+    controller.customizeTab,
     controller.activeVersion,
     controller.dataModel,
     controller.pending,
@@ -65,6 +73,7 @@ export function DashboardView({ expenses, uiVersions, activeVersionId }: Dashboa
     controller.appliedDraftIds,
     uiVersions,
     setDashboardHost,
+    openPanel,
   ]);
 
   useEffect(() => {
@@ -82,6 +91,8 @@ export function DashboardView({ expenses, uiVersions, activeVersionId }: Dashboa
       feedback={controller.feedback}
       previewDraft={controller.previewDraft}
       compareMode={controller.compareMode}
+      isCustomizeOpen={visiblePanel === "customize"}
+      onOpenCustomize={() => openPanel("customize")}
       onDataModelChange={controller.handleDataModelChange}
       onAction={(act) => void controller.handleAction(act)}
     />

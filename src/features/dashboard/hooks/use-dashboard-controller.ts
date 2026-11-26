@@ -3,10 +3,6 @@ import { action } from "@void/react";
 import type { UiVersion } from "@schema";
 import { getByPath, type DataModel } from "@/features/a2ui/data-model";
 import { a2uiMessagesSchema, type A2UIAction, type A2UIMessage } from "@/features/a2ui/types";
-import type {
-  AssistantSidebarTab,
-  DashboardEditorDraft,
-} from "@/features/ai-chat/context/assistant-context";
 import type { AiPreviewDraft, CompareMode } from "@/features/ai-chat/types";
 import { runExpenseA2UIAction, type ExpenseActionResult } from "@/features/expenses/actions";
 import {
@@ -21,7 +17,14 @@ export interface DashboardFeedback {
   message: string;
 }
 
-export type EditorDraft = DashboardEditorDraft;
+export type CustomizePanelTab = "history" | "editor";
+
+export interface EditorDraft {
+  name: string;
+  description: string;
+  json: string;
+  error: string | null;
+}
 
 function parseMessages(json: string): A2UIMessage[] {
   try {
@@ -55,7 +58,7 @@ export function useDashboardController({
   const [pending, setPending] = useState(false);
   const [feedback, setFeedback] = useState<DashboardFeedback | null>(null);
 
-  const [panelTab, setPanelTab] = useState<AssistantSidebarTab>("ai");
+  const [customizeTab, setCustomizeTab] = useState<CustomizePanelTab>("history");
   const [editorDraft, setEditorDraft] = useState<EditorDraft>(() => ({
     name: `v${uiVersions.length + 1}：カスタム定義`,
     description: "",
@@ -152,7 +155,7 @@ export function useDashboardController({
       json: activeVersion?.messagesJson ?? prev.json,
       error: null,
     }));
-    setPanelTab("editor");
+    setCustomizeTab("editor");
   };
 
   const handleSaveNewVersion = async () => {
@@ -171,7 +174,7 @@ export function useDashboardController({
         updateEditorDraft({ error: res.error.message });
         return;
       }
-      setPanelTab("history");
+      setCustomizeTab("history");
       setFeedback({ type: "success", message: `新しいUIバージョン「${name}」を保存しました。` });
     } finally {
       setPending(false);
@@ -214,7 +217,7 @@ export function useDashboardController({
       json: messagesJson,
       error: null,
     });
-    setPanelTab("editor");
+    setCustomizeTab("editor");
   };
 
   return {
@@ -223,8 +226,8 @@ export function useDashboardController({
     dataModel,
     pending,
     feedback,
-    panelTab,
-    setPanelTab,
+    customizeTab,
+    setCustomizeTab,
     editorDraft,
     updateEditorDraft,
     previewDraft,

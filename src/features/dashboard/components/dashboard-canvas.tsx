@@ -1,10 +1,11 @@
-import { Eye } from "lucide-react";
+import { Eye, SlidersHorizontal } from "lucide-react";
 import type { UiVersion } from "@schema";
 import { A2UISurface } from "@/features/a2ui/components/a2ui-surface";
 import type { DataModel } from "@/features/a2ui/data-model";
 import type { A2UIAction, A2UIMessage } from "@/features/a2ui/types";
 import type { AiPreviewDraft, CompareMode } from "@/features/ai-chat/types";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { DashboardFeedback } from "../hooks/use-dashboard-controller";
 
@@ -16,6 +17,8 @@ interface DashboardCanvasProps {
   feedback: DashboardFeedback | null;
   previewDraft: AiPreviewDraft | null;
   compareMode: CompareMode;
+  isCustomizeOpen: boolean;
+  onOpenCustomize: () => void;
   onDataModelChange: (next: DataModel) => void;
   onAction: (action: A2UIAction) => void;
 }
@@ -28,6 +31,8 @@ export function DashboardCanvas({
   feedback,
   previewDraft,
   compareMode,
+  isCustomizeOpen,
+  onOpenCustomize,
   onDataModelChange,
   onAction,
 }: DashboardCanvasProps) {
@@ -48,10 +53,9 @@ export function DashboardCanvas({
         previewDraft && compareMode === "split" ? "max-w-7xl" : "max-w-6xl",
       )}
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex min-h-8 items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <h1 className="truncate text-xl font-bold tracking-tight">ダッシュボード</h1>
-          {activeVersion && <Badge variant="outline">v{activeVersion.version}</Badge>}
           {previewDraft && (
             <Badge variant="default" className="gap-1">
               <Eye className="size-3" />
@@ -59,6 +63,20 @@ export function DashboardCanvas({
             </Badge>
           )}
         </div>
+
+        {!isCustomizeOpen && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0 gap-2"
+            onClick={onOpenCustomize}
+          >
+            <SlidersHorizontal className="size-3.5" />
+            <span>カスタマイズ</span>
+            {activeVersion && <Badge variant="secondary">v{activeVersion.version}</Badge>}
+          </Button>
+        )}
       </div>
 
       {feedback && (
