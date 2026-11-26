@@ -5,10 +5,18 @@ import net from "node:net";
 const PUBLIC_HOST = "127.0.0.1";
 const PUBLIC_PORT = Number(process.env.CODEX_PROXY_PORT || 4500);
 const INTERNAL_PORT = Number(process.env.CODEX_INTERNAL_PORT || 4501);
+const APP_URL = (process.env.APP_URL || "http://localhost:5173").replace(/\/$/, "");
+const MCP_URL = process.env.MCP_URL || `${APP_URL}/api/mcp`;
 
 const codexProc = spawn(
   "codex",
-  ["app-server", "--listen", `ws://${PUBLIC_HOST}:${INTERNAL_PORT}`],
+  [
+    "app-server",
+    "--listen",
+    `ws://${PUBLIC_HOST}:${INTERNAL_PORT}`,
+    "-c",
+    `mcp_servers.kakeibo.url=${MCP_URL}`,
+  ],
   {
     shell: process.platform === "win32",
     stdio: "inherit",
@@ -84,6 +92,7 @@ proxyServer.listen(PUBLIC_PORT, PUBLIC_HOST, () => {
   console.log(
     `[codex:server] Browser-ready WebSocket proxy listening on ws://${PUBLIC_HOST}:${PUBLIC_PORT} -> ws://${PUBLIC_HOST}:${INTERNAL_PORT}`,
   );
+  console.log(`[codex:server] Kakeibo MCP server configured: ${MCP_URL}`);
 });
 
 function shutdown() {

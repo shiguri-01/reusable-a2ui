@@ -1,11 +1,62 @@
 import type { ChatRequestOptions, ChatTransport, UIMessage, UIMessageChunk } from "ai";
 import type { CodexAppServerClient } from "./client";
 
+const MUTATING_TOOL_NAMES = new Set([
+  "create_expenses",
+  "update_expense",
+  "delete_expenses",
+  "activate_ui_version",
+  "save_ui_version",
+]);
+
 export interface CodexChatTransportOptions {
   client: CodexAppServerClient;
   getDeveloperInstructions: () => string;
   formatUserPrompt: (userText: string) => string;
+  onDataMutated?: (toolName: string) => void;
   effort?: "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
+}
+
+interface McpToolCallItem {
+  type: "mcpToolCall";
+  id?: string;
+  server?: string;
+  tool?: string;
+  status?: string;
+  arguments?: unknown;
+  result?: {
+    content?: Array<{ type?: string; text?: string }>;
+    structuredContent?: unknown;
+  } | null;
+  error?: { message?: string } | null;
+}
+
+function isMcpToolCallItem(item: unknown): item is McpToolCallItem {
+  return (
+    Boolean(item) && typeof item === "object" && (item as { type?: unknown }).type === "mcpToolCall"
+  );
+}
+
+function extractMcpToolOutput(result: McpToolCallItem["result"]): unknown {
+  if (!result) return null;
+  if (result.structuredContent !== undefined && result.structuredContent !== null) {
+    return result.structuredContent;
+  }
+  if (Array.isArray(result.content)) {
+    const text = result.content
+      .filter((part) => part.type === "text" && typeof part.text === "string")
+      .map((part) => part.text)
+      .join("\n")
+      .trim();
+    if (text) {
+      try {
+        return JSON.parse(text);
+      } catch {
+        return text;
+      }
+    }
+  }
+  return result;
 }
 
 function extractLastUserText(messages: UIMessage[]): string {
@@ -24,18 +75,20 @@ function extractLastUserText(messages: UIMessage[]): string {
 
 /**
  * Bridges Vercel AI SDK's `useChat` hook to a local `codex app-server` WebSocket endpoint.
- * Maps Codex JSON-RPC notifications into AI SDK `UIMessageChunk` stream events.
+ * Maps Codex JSON-RPC notifications (text, reasoning, MCP tool calls) into AI SDK `UIMessageChunk` stream events.
  */
 export class CodexChatTransport implements ChatTransport<UIMessage> {
   private readonly client: CodexAppServerClient;
   private readonly getDeveloperInstructions: () => string;
   private readonly formatUserPrompt: (userText: string) => string;
+  private readonly onDataMutated?: (toolName: string) => void;
   private readonly effort: "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
   constructor(options: CodexChatTransportOptions) {
     this.client = options.client;
     this.getDeveloperInstructions = options.getDeveloperInstructions;
     this.formatUserPrompt = options.formatUserPrompt;
+    this.onDataMutated = options.onDataMutated;
     this.effort = options.effort ?? "low";
   }
 
@@ -72,6 +125,7 @@ export class CodexChatTransport implements ChatTransport<UIMessage> {
         let closed = false;
         const startedTextIds = new Set<string>();
         const startedReasoningIds = new Set<string>();
+        const startedToolCallIds = new Set<string>();
 
         const safeEnqueue = (chunk: UIMessageChunk) => {
           if (closed) return;
@@ -137,6 +191,63 @@ export class CodexChatTransport implements ChatTransport<UIMessage> {
 
           const notifTurnId = typeof params.turnId === "string" ? params.turnId : undefined;
           if (activeTurnId && notifTurnId && notifTurnId !== activeTurnId) return;
+
+          if (method === "item/started" && isMcpToolCallItem(params.item)) {
+            const item = params.item;
+            const toolCallId = item.id ?? `mcp-${Date.now()}`;
+            const toolName = item.tool ?? "mcp_tool";
+            if (!startedToolCallIds.has(toolCallId)) {
+              startedToolCallIds.add(toolCallId);
+              safeEnqueue({
+                type: "tool-input-available",
+                toolCallId,
+                toolName,
+                input: item.arguments ?? {},
+                dynamic: true,
+                providerExecuted: true,
+              });
+            }
+            return;
+          }
+
+          if (method === "item/completed" && isMcpToolCallItem(params.item)) {
+            const item = params.item;
+            const toolCallId = item.id ?? `mcp-${Date.now()}`;
+            const toolName = item.tool ?? "mcp_tool";
+            if (!startedToolCallIds.has(toolCallId)) {
+              startedToolCallIds.add(toolCallId);
+              safeEnqueue({
+                type: "tool-input-available",
+                toolCallId,
+                toolName,
+                input: item.arguments ?? {},
+                dynamic: true,
+                providerExecuted: true,
+              });
+            }
+
+            if (item.status === "failed" || item.error) {
+              safeEnqueue({
+                type: "tool-output-error",
+                toolCallId,
+                errorText: item.error?.message || "MCP ツールの実行に失敗しました",
+                dynamic: true,
+                providerExecuted: true,
+              });
+            } else {
+              safeEnqueue({
+                type: "tool-output-available",
+                toolCallId,
+                output: extractMcpToolOutput(item.result),
+                dynamic: true,
+                providerExecuted: true,
+              });
+              if (MUTATING_TOOL_NAMES.has(toolName)) {
+                this.onDataMutated?.(toolName);
+              }
+            }
+            return;
+          }
 
           if (method === "item/reasoning/summaryTextDelta") {
             const itemId = typeof params.itemId === "string" ? params.itemId : "reasoning-0";

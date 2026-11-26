@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { action } from "@void/react";
+import { action, useRouter } from "@void/react";
 import { Check, Code2, Eye, History, Plus, Sparkles, X } from "lucide-react";
 import { getByPath, type DataModel } from "@/a2ui/data-model";
 import { A2UISurface } from "@/a2ui/renderer";
@@ -21,9 +21,14 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarInset,
-  SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
+import {
+  DEFAULT_SIDEBAR_WIDTH,
+  MAX_SIDEBAR_WIDTH,
+  MIN_SIDEBAR_WIDTH,
+  SIDEBAR_WIDTH_STORAGE_KEY,
+} from "./layout";
 import { Textarea } from "@/components/ui/textarea";
 import { buildExpenseDataModel, EXPENSE_CATEGORIES, getTodayIso } from "@/lib/expenses";
 import { cn } from "@/lib/utils";
@@ -55,7 +60,65 @@ function MobileSidebarCloseButton() {
   );
 }
 
+function SidebarResizeHandle() {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const wrapper = e.currentTarget.closest<HTMLElement>('[data-slot="sidebar-wrapper"]');
+    if (!wrapper) return;
+
+    const startX = e.clientX;
+    const currentWidth =
+      parseFloat(getComputedStyle(wrapper).getPropertyValue("--sidebar-width")) ||
+      DEFAULT_SIDEBAR_WIDTH;
+    let latestWidth = currentWidth;
+
+    wrapper.setAttribute("data-resizing", "true");
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const handleMove = (ev: PointerEvent) => {
+      const delta = startX - ev.clientX;
+      latestWidth = Math.round(
+        Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, currentWidth + delta)),
+      );
+      wrapper.style.setProperty("--sidebar-width", `${latestWidth}px`);
+    };
+
+    const handleUp = () => {
+      wrapper.removeAttribute("data-resizing");
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(latestWidth));
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+    };
+
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const wrapper = e.currentTarget.closest<HTMLElement>('[data-slot="sidebar-wrapper"]');
+    if (!wrapper) return;
+    wrapper.style.setProperty("--sidebar-width", `${DEFAULT_SIDEBAR_WIDTH}px`);
+    window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(DEFAULT_SIDEBAR_WIDTH));
+  };
+
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="サイドバーの幅を調整（ダブルクリックでリセット）"
+      title="ドラッグして幅を調整（ダブルクリックで初期幅に戻す）"
+      onPointerDown={handlePointerDown}
+      onDoubleClick={handleDoubleClick}
+      className="hover:after:bg-primary/40 active:after:bg-primary/60 absolute inset-y-0 -left-1.5 z-20 hidden w-3 cursor-col-resize after:absolute after:inset-y-0 after:left-1/2 after:w-0.5 after:-translate-x-1/2 after:transition-colors md:block"
+    />
+  );
+}
+
 export default function DashboardPage({ expenses, uiVersions, activeVersionId }: Props) {
+  const router = useRouter();
   const activeVersion =
     uiVersions.find((v) => v.id === activeVersionId) ?? uiVersions[uiVersions.length - 1];
 
@@ -381,7 +444,7 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
           <div className="flex h-12 shrink-0 items-center justify-between border-b pr-2 pl-4">
             <div className="flex items-center gap-2">
               <Sparkles className="text-primary size-4" />
-              <span className="text-sm font-semibold">UI 調整</span>
+              <span className="text-sm font-semibold">AI アシスタント</span>
             </div>
             <MobileSidebarCloseButton />
           </div>
@@ -400,7 +463,7 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
                 )}
               >
                 <Sparkles className="size-3.5" />
-                AI調整
+                AI
               </button>
               <button
                 type="button"
@@ -450,6 +513,9 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
                 previewDraft={previewDraft}
                 compareMode={compareMode}
                 appliedMessageIds={appliedMessageIds}
+                onDataMutated={() => {
+                  void router.refresh();
+                }}
                 onPreviewA2UI={handlePreviewAiVersion}
                 onChangeCompareMode={setCompareMode}
                 onDiscardPreview={() => setPreviewDraft(null)}
@@ -574,7 +640,7 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
           </SidebarFooter>
         )}
 
-        <SidebarRail />
+        <SidebarResizeHandle />
       </Sidebar>
     </>
   );

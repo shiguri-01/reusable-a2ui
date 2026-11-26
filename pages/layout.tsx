@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Link, useRouter } from "@void/react";
 import { Layers, PanelRight, ReceiptText, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,11 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import "./style.css";
+
+export const DEFAULT_SIDEBAR_WIDTH = 448;
+export const MIN_SIDEBAR_WIDTH = 320;
+export const MAX_SIDEBAR_WIDTH = 720;
+export const SIDEBAR_WIDTH_STORAGE_KEY = "reusable-a2ui:sidebar-width:v1";
 
 function HeaderSidebarToggle() {
   const { open, openMobile, isMobile, toggleSidebar } = useSidebar();
@@ -21,13 +26,13 @@ function HeaderSidebarToggle() {
         "gap-1.5 text-xs",
         isOpen ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
       )}
-      aria-label={isOpen ? "UI 調整パネルを閉じる" : "UI 調整パネルを開く"}
+      aria-label={isOpen ? "AI アシスタントを閉じる" : "AI アシスタントを開く"}
       aria-expanded={isOpen}
-      title="UI 調整パネルを開閉 (Ctrl+B)"
+      title="AI アシスタントを開閉 (Ctrl+B)"
       onClick={toggleSidebar}
     >
       <PanelRight className="size-4" />
-      <span className="hidden sm:inline">UI 調整</span>
+      <span className="hidden sm:inline">AI アシスタント</span>
     </Button>
   );
 }
@@ -35,6 +40,16 @@ function HeaderSidebarToggle() {
 export default function RootLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const isDashboard = router.path === "/";
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
+
+  useEffect(() => {
+    const raw = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = Number(raw);
+    if (Number.isFinite(parsed) && parsed >= MIN_SIDEBAR_WIDTH && parsed <= MAX_SIDEBAR_WIDTH) {
+      setSidebarWidth(parsed);
+    }
+  }, []);
 
   return (
     <SidebarProvider
@@ -42,8 +57,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       className="bg-muted/30 flex min-h-screen flex-col"
       style={
         {
-          "--sidebar-width": "24rem",
-          "--sidebar-width-mobile": "22rem",
+          "--sidebar-width": `${sidebarWidth}px`,
+          "--sidebar-width-mobile": "24rem",
         } as CSSProperties
       }
     >

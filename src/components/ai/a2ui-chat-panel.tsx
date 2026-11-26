@@ -32,9 +32,9 @@ export type { AiPreviewDraft, CompareMode } from "./types";
 const STORAGE_KEY_WS_URL = "reusable-a2ui:codex-ws-url:v3";
 
 const QUICK_PROMPTS = [
+  "今日のランチ980円（食費）とコーヒー450円（カフェ）を記録して",
+  "今の支出をカテゴリ別に分析して、予算残高と節約ポイントを教えて",
   "予算管理とカテゴリ分析を最上部に大きく見せるレイアウトにして",
-  "支出入力フォームを最上部に置いたシンプルな1カラムにして",
-  "KPIを4枚構成にして、最近の支出を5件だけ表示するコンパクト版にして",
 ];
 
 interface A2UIChatPanelProps {
@@ -45,6 +45,7 @@ interface A2UIChatPanelProps {
   previewDraft: AiPreviewDraft | null;
   compareMode: CompareMode;
   appliedMessageIds: Record<string, boolean>;
+  onDataMutated: (toolName: string) => void;
   onPreviewA2UI: (draft: AiPreviewDraft) => void;
   onChangeCompareMode: (mode: CompareMode) => void;
   onDiscardPreview: () => void;
@@ -70,6 +71,7 @@ export function A2UIChatPanel({
   previewDraft,
   compareMode,
   appliedMessageIds,
+  onDataMutated,
   onPreviewA2UI,
   onChangeCompareMode,
   onDiscardPreview,
@@ -83,6 +85,9 @@ export function A2UIChatPanel({
 
   const latestContextRef = useRef({ activeVersionName, currentMessagesJson });
   latestContextRef.current = { activeVersionName, currentMessagesJson };
+
+  const onDataMutatedRef = useRef(onDataMutated);
+  onDataMutatedRef.current = onDataMutated;
 
   const client = useMemo(() => new CodexAppServerClient(getInitialWsUrl()), []);
   const [codexStatus, setCodexStatus] = useState<CodexClientStatus>(() => client.getStatus());
@@ -109,6 +114,7 @@ export function A2UIChatPanel({
             activeVersionName: latestContextRef.current.activeVersionName,
             currentMessagesJson: latestContextRef.current.currentMessagesJson,
           }),
+        onDataMutated: (toolName) => onDataMutatedRef.current(toolName),
         effort: "low",
       }),
     [client],
@@ -203,8 +209,8 @@ export function A2UIChatPanel({
         <ScrollArea className="h-full" viewportRef={scrollRef}>
           <div ref={contentRef} className="space-y-3 px-4 py-3">
             {messages.length === 0 ? (
-              <div className="space-y-1.5 py-2">
-                <div className="text-muted-foreground text-[11px] font-medium">プロンプト例</div>
+              <div className="space-y-2 py-2">
+                <div className="text-muted-foreground text-xs font-medium">プロンプト例</div>
                 <div className="space-y-1.5">
                   {QUICK_PROMPTS.map((prompt) => (
                     <button
@@ -212,7 +218,7 @@ export function A2UIChatPanel({
                       type="button"
                       disabled={isStreaming}
                       onClick={() => void handleSendText(prompt)}
-                      className="bg-background hover:bg-accent/60 w-full cursor-pointer rounded-md border px-2.5 py-2 text-left text-xs leading-snug transition-colors disabled:opacity-50"
+                      className="bg-background hover:bg-accent/60 w-full cursor-pointer rounded-md border px-3 py-2 text-left text-sm leading-snug transition-colors disabled:opacity-50"
                     >
                       {prompt}
                     </button>
@@ -238,15 +244,15 @@ export function A2UIChatPanel({
             )}
 
             {isStreaming && messages[messages.length - 1]?.role === "user" && (
-              <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                <Loader2 className="size-3.5 animate-spin" />
+              <div className="text-muted-foreground flex items-center gap-1.5 text-sm">
+                <Loader2 className="size-4 animate-spin" />
                 応答中...
               </div>
             )}
 
             {error && (
-              <div className="bg-destructive/10 text-destructive flex items-start gap-2 rounded-md border border-destructive/20 p-2.5 text-xs">
-                <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
+              <div className="bg-destructive/10 text-destructive flex items-start gap-2 rounded-md border border-destructive/20 p-2.5 text-sm">
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
                 <span className="leading-relaxed">{error.message}</span>
               </div>
             )}
@@ -291,9 +297,9 @@ export function A2UIChatPanel({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="UI の変更したい内容を入力..."
+            placeholder="支出の記録・分析や、UI の変更を依頼..."
             rows={2}
-            className="min-h-[60px] resize-none border-0 pr-11 text-xs shadow-none focus-visible:ring-0"
+            className="min-h-[64px] resize-none border-0 pr-11 text-sm shadow-none focus-visible:ring-0"
           />
           <div className="absolute right-2 bottom-2">
             {isStreaming ? (

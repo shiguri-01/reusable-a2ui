@@ -1,65 +1,14 @@
 import { defineHandler, type InferProps } from "void";
 import { ValidationError } from "void/handler";
-import { asc, db, desc, eq } from "void/db";
-import { expenses, insertExpenseSchema, uiVersions } from "@schema";
+import { db, desc, eq } from "void/db";
+import { expenses, insertExpenseSchema } from "@schema";
 import { z } from "zod";
-import { PRESET_UI_VERSIONS } from "@/a2ui/presets";
 import { a2uiMessagesSchema } from "@/a2ui/types";
-
-const SURFACE_ID = "expense-dashboard";
-
-async function ensureDefaultUiVersions() {
-  const existing = await db
-    .select()
-    .from(uiVersions)
-    .where(eq(uiVersions.surfaceId, SURFACE_ID))
-    .orderBy(asc(uiVersions.version));
-
-  if (existing.length > 0) {
-    let updated = false;
-    for (const row of existing) {
-      const preset = PRESET_UI_VERSIONS.find((p) => p.version === row.version);
-      if (!preset) continue;
-      const nextJson = JSON.stringify(preset.messages, null, 2);
-      if (row.name.includes(": ") || row.messagesJson.includes("例: ")) {
-        await db
-          .update(uiVersions)
-          .set({
-            name: preset.name,
-            description: preset.description,
-            messagesJson: nextJson,
-          })
-          .where(eq(uiVersions.id, row.id));
-        updated = true;
-      }
-    }
-    if (!updated) {
-      return existing;
-    }
-    return await db
-      .select()
-      .from(uiVersions)
-      .where(eq(uiVersions.surfaceId, SURFACE_ID))
-      .orderBy(asc(uiVersions.version));
-  }
-
-  await db.insert(uiVersions).values(
-    PRESET_UI_VERSIONS.map((preset) => ({
-      surfaceId: SURFACE_ID,
-      version: preset.version,
-      name: preset.name,
-      description: preset.description,
-      messagesJson: JSON.stringify(preset.messages, null, 2),
-      isActive: preset.version === 3 ? 1 : 0,
-    })),
-  );
-
-  return await db
-    .select()
-    .from(uiVersions)
-    .where(eq(uiVersions.surfaceId, SURFACE_ID))
-    .orderBy(asc(uiVersions.version));
-}
+import {
+  activateUiVersionById,
+  createAndActivateUiVersion,
+  ensureDefaultUiVersions,
+} from "@/lib/ui-versions";
 
 export type Props = InferProps<typeof loader>;
 
@@ -99,8 +48,7 @@ export const actions = {
       id: z.number().int().positive(),
     }),
   })(async (_c, { body }) => {
-    await db.update(uiVersions).set({ isActive: 0 }).where(eq(uiVersions.surfaceId, SURFACE_ID));
-    await db.update(uiVersions).set({ isActive: 1 }).where(eq(uiVersions.id, body.id));
+    await activateUiVersionById(body.id);
   }),
 
   saveVersion: defineHandler.withValidator({
@@ -125,23 +73,10 @@ export const actions = {
       });
     }
 
-    const existing = await db
-      .select({ version: uiVersions.version })
-      .from(uiVersions)
-      .where(eq(uiVersions.surfaceId, SURFACE_ID))
-      .orderBy(desc(uiVersions.version))
-      .limit(1);
-
-    const nextVersion = (existing[0]?.version ?? 0) + 1;
-
-    await db.update(uiVersions).set({ isActive: 0 }).where(eq(uiVersions.surfaceId, SURFACE_ID));
-    await db.insert(uiVersions).values({
-      surfaceId: SURFACE_ID,
-      version: nextVersion,
+    await createAndActivateUiVersion({
       name: body.name,
       description: body.description,
-      messagesJson: JSON.stringify(validated.data, null, 2),
-      isActive: 1,
+      messages: validated.data,
     });
   }),
 };

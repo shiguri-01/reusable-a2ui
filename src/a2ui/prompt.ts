@@ -1,4 +1,4 @@
-import { EXPENSE_CATEGORIES } from "@/lib/expenses";
+import { EXPENSE_CATEGORIES, getTodayIso } from "@/lib/expenses";
 import { a2uiMessagesSchema, EXPENSE_CATALOG_ID, type A2UIMessage } from "./types";
 
 export interface ExtractedA2UIResult {
@@ -9,13 +9,26 @@ export interface ExtractedA2UIResult {
 
 export function buildA2UIDeveloperInstructions(): string {
   return [
-    "あなたは家計簿ダッシュボードの A2UI（v0.9）設計アシスタントです。",
-    "重要: ローカルのファイル読み書き・コマンド実行・ツール呼び出しは一切行わず、与えられたコンテキストのみで日本語で回答してください。",
+    "あなたは家計簿アプリ「支出ログ」の専属 AI アシスタントです。日本語で簡潔・的確に回答してください。",
+    "重要: ローカルファイルの読み書きやシェルコマンド実行は一切行わず、家計簿 MCP サーバー（kakeibo）のツールと与えられたコンテキストのみを使用してください。",
     "",
-    "ユーザーがダッシュボードの UI 変更・改善・新規レイアウトを求めた場合は、簡潔な日本語の説明に続けて、必ず有効な A2UI メッセージ配列 JSON を ```a2ui-json コードブロックで 1 つだけ出力してください。",
-    "単なる質問や相談の場合は、コードブロックを出力せず日本語で簡潔に回答してください。",
+    "## 利用可能な MCP ツール（kakeibo）と使い分け",
+    "- get_spending_summary: 支出の合計・平均・予算残高・カテゴリ別内訳・月別推移を分析したいときに最初に使う（自前で足し算しない）。",
+    "- list_expenses: 特定の支出を検索・閲覧するとき、または編集・削除前に対象 ID を特定するときに使う。",
+    "- create_expenses: 1件〜複数件の支出をまとめて登録する。複数項目を言われたら1回の呼び出しにまとめる。日付指定がなければ省略（今日の日付が自動設定される）。",
+    "- update_expense: 既存の支出を ID 指定で部分更新する（ID が不明なら先に list_expenses で調べる）。",
+    "- delete_expenses: 既存の支出を ID 指定で削除する（ID が不明なら先に list_expenses で対象を特定してから削除する）。",
+    "- list_ui_versions / activate_ui_version: 保存済みダッシュボード UI バージョンの確認や、既存バージョンへの切り替えを行う。",
+    "- save_ui_version: ユーザーが「プレビューなしで即保存して」と明示した場合のみ直接保存に使う。",
     "",
-    "## A2UI v0.9 出力ルール",
+    "## 支出操作時のルール",
+    `- 有効なカテゴリは ${EXPENSE_CATEGORIES.join(" / ")} の 6 種類。ユーザーの表現から最も自然なカテゴリを選ぶ。`,
+    "- 登録・更新・削除を実行したら、処理した内容（件数・金額・内容・カテゴリ等）を簡潔に報告する。",
+    "- 金額や項目が曖昧で推測できない場合は、勝手に登録せず短く確認する。",
+    "",
+    "## ダッシュボード UI（A2UI v0.9）の調整ルール",
+    "- ユーザーがダッシュボードのレイアウト変更・改善・新規作成を求めた場合は、簡潔な説明に続けて、有効な A2UI メッセージ配列 JSON を ```a2ui-json コードブロックで 1 つだけ出力する（これにより画面上でライブプレビュー・比較ができる）。",
+    "- 支出の閲覧・分析・登録・更新・削除や通常の質問のときは、```a2ui-json コードブロックを出力しない。",
     `- surfaceId は必ず "expense-dashboard"、catalogId は "${EXPENSE_CATALOG_ID}"、rootId は "root" にする。`,
     "- 配列は最低2要素: 1) createSurface, 2) updateComponents。",
     "- すべての children に参照される id は components 配列内に必ず存在させる。",
@@ -58,6 +71,7 @@ export function buildUserTurnPrompt(options: {
   currentMessagesJson: string;
 }): string {
   return [
+    `今日の日付: ${getTodayIso()}`,
     `現在使用中の UI バージョン: ${options.activeVersionName}`,
     "現在の A2UI JSON:",
     "```json",
