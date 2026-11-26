@@ -1,5 +1,5 @@
 import { defineSeed } from "void/seed";
-import { PRESET_UI_VERSIONS } from "../src/a2ui/presets";
+import { PRESET_UI_VERSIONS } from "../src/features/a2ui/presets";
 
 const SAMPLE_EXPENSES = [
   {

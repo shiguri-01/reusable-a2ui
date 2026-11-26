@@ -5,13 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
+import {
+  DEFAULT_SIDEBAR_WIDTH,
+  MAX_SIDEBAR_WIDTH,
+  MIN_SIDEBAR_WIDTH,
+  SIDEBAR_WIDTH_STORAGE_KEY,
+} from "@/features/dashboard/constants";
 import { cn } from "@/lib/utils";
 import "./style.css";
-
-export const DEFAULT_SIDEBAR_WIDTH = 448;
-export const MIN_SIDEBAR_WIDTH = 320;
-export const MAX_SIDEBAR_WIDTH = 720;
-export const SIDEBAR_WIDTH_STORAGE_KEY = "reusable-a2ui:sidebar-width:v1";
 
 function HeaderSidebarToggle() {
   const { open, openMobile, isMobile, toggleSidebar } = useSidebar();

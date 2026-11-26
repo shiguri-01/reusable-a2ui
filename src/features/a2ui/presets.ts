@@ -1,4 +1,4 @@
-import { EXPENSE_CATEGORIES } from "../lib/expenses";
+import { EXPENSE_CATEGORIES } from "../expenses/model";
 import { EXPENSE_CATALOG_ID, type A2UIMessage } from "./types";
 
 export interface PresetUiVersion {

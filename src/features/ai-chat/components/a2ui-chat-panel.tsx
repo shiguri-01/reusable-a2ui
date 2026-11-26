@@ -1,29 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useChat } from "@ai-sdk/react";
+import { useEffect, useState } from "react";
 import { AlertCircle, ArrowDown, ArrowUp, Loader2, Square } from "lucide-react";
 import { useStickToBottom } from "use-stick-to-bottom";
-import type { DataModel } from "@/a2ui/data-model";
-import { buildA2UIDeveloperInstructions, buildUserTurnPrompt } from "@/a2ui/prompt";
-import type { A2UIAction } from "@/a2ui/types";
+import type { DataModel } from "@/features/a2ui/data-model";
+import type { A2UIAction } from "@/features/a2ui/types";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  CodexAppServerClient,
-  DEFAULT_CODEX_WS_URL,
-  type CodexClientStatus,
-  type McpElicitationRequest,
-} from "@/lib/codex/client";
-import { CodexChatTransport } from "@/lib/codex/transport";
+import { useCodexChat } from "../hooks/use-codex-chat";
+import type { AiPreviewDraft, CompareMode } from "../types";
 import { ChatMessageItem } from "./chat-message-item";
 import { CodexConnectionBar } from "./codex-connection-bar";
 import { McpApprovalCard } from "./mcp-approval-card";
 import { PreviewCompareDock } from "./preview-compare-dock";
-import type { AiPreviewDraft, CompareMode } from "./types";
 
-export type { AiPreviewDraft, CompareMode } from "./types";
-
-const STORAGE_KEY_WS_URL = "reusable-a2ui:codex-ws-url:v3";
+export type { AiPreviewDraft, CompareMode } from "../types";
 
 const QUICK_PROMPTS = [
   "今月の予算状況と使いすぎているカテゴリを教えて",
@@ -51,11 +41,6 @@ interface A2UIChatPanelProps {
   onOpenInEditor: (messagesJson: string, suggestedName?: string) => void;
 }
 
-function getInitialWsUrl(): string {
-  if (typeof window === "undefined") return DEFAULT_CODEX_WS_URL;
-  return window.localStorage.getItem(STORAGE_KEY_WS_URL) || DEFAULT_CODEX_WS_URL;
-}
-
 export function A2UIChatPanel({
   activeVersionName,
   currentMessagesJson,
@@ -72,93 +57,34 @@ export function A2UIChatPanel({
   onApplyA2UI,
   onOpenInEditor,
 }: A2UIChatPanelProps) {
-  const [wsUrlInput, setWsUrlInput] = useState(getInitialWsUrl);
   const [showSettings, setShowSettings] = useState(false);
   const [input, setInput] = useState("");
-  const [pendingElicitations, setPendingElicitations] = useState<McpElicitationRequest[]>([]);
-  const [autoApproveSession, setAutoApproveSession] = useState(false);
 
-  const autoApproveSessionRef = useRef(autoApproveSession);
-  autoApproveSessionRef.current = autoApproveSession;
-
-  const latestContextRef = useRef({ activeVersionName, currentMessagesJson });
-  latestContextRef.current = { activeVersionName, currentMessagesJson };
-
-  const onDataMutatedRef = useRef(onDataMutated);
-  onDataMutatedRef.current = onDataMutated;
-
-  const onPreviewRef = useRef(onPreviewA2UI);
-  onPreviewRef.current = onPreviewA2UI;
-
-  const client = useMemo(() => new CodexAppServerClient(getInitialWsUrl()), []);
-  const [codexStatus, setCodexStatus] = useState<CodexClientStatus>(() => client.getStatus());
-
-  useEffect(() => {
-    const unsubscribeStatus = client.subscribeStatus((nextStatus) => {
-      setCodexStatus(nextStatus);
-      if (nextStatus.state === "disconnected" || nextStatus.state === "error") {
-        setPendingElicitations([]);
-      }
-    });
-    const unsubscribeElicitations = client.subscribeMcpElicitations((request) => {
-      if (
-        autoApproveSessionRef.current &&
-        (request.approvalKind === "mcp_tool_call" || request.serverName === "kakeibo")
-      ) {
-        client.respondToMcpElicitation(request.requestId, {
-          action: "accept",
-          persist: request.persistOptions.includes("session") ? "session" : undefined,
-        });
-        return;
-      }
-      setPendingElicitations((prev) => {
-        if (prev.some((item) => item.requestId === request.requestId)) return prev;
-        return [...prev, request];
-      });
-    });
-    const unsubscribeNotifications = client.subscribeNotifications((method, params) => {
-      if (method === "serverRequest/resolved") {
-        const resolvedId = params.requestId;
-        if (typeof resolvedId === "string" || typeof resolvedId === "number") {
-          setPendingElicitations((prev) => prev.filter((item) => item.requestId !== resolvedId));
-        }
-      }
-    });
-    void client.connect().catch(() => {
-      // Connection bar guides the user to start the local server
-    });
-    return () => {
-      unsubscribeStatus();
-      unsubscribeElicitations();
-      unsubscribeNotifications();
-      client.disconnect();
-    };
-  }, [client]);
-
-  const transport = useMemo(
-    () =>
-      new CodexChatTransport({
-        client,
-        getDeveloperInstructions: buildA2UIDeveloperInstructions,
-        formatUserPrompt: (userText) =>
-          buildUserTurnPrompt({
-            userText,
-            activeVersionName: latestContextRef.current.activeVersionName,
-            currentMessagesJson: latestContextRef.current.currentMessagesJson,
-          }),
-        onDataMutated: (toolName) => onDataMutatedRef.current(toolName),
-        onDashboardProposed: (proposal) => onPreviewRef.current(proposal),
-        effort: "low",
-      }),
-    [client],
-  );
-
-  const { messages, sendMessage, status, stop, setMessages, error, clearError } = useChat({
-    transport,
+  const {
+    wsUrlInput,
+    setWsUrlInput,
+    codexStatus,
+    messages,
+    isStreaming,
+    error,
+    pendingElicitations,
+    autoApproveSession,
+    setAutoApproveSession,
+    activeRunningTool,
+    approveElicitation,
+    declineElicitation,
+    connect,
+    resetChat,
+    stopStreaming,
+    sendPrompt,
+  } = useCodexChat({
+    activeVersionName,
+    currentMessagesJson,
+    onDataMutated,
+    onPreviewA2UI,
   });
 
   const { scrollRef, contentRef, isAtBottom, scrollToBottom } = useStickToBottom();
-  const isStreaming = status === "submitted" || status === "streaming";
 
   useEffect(() => {
     if (pendingElicitations.length > 0) {
@@ -166,89 +92,18 @@ export function A2UIChatPanel({
     }
   }, [pendingElicitations.length, scrollToBottom]);
 
-  const activeRunningTool = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i];
-      if (msg?.role !== "assistant") continue;
-      for (let j = msg.parts.length - 1; j >= 0; j--) {
-        const part = msg.parts[j];
-        if (
-          part.type === "dynamic-tool" &&
-          (part.state === "input-available" || part.state === "input-streaming")
-        ) {
-          const params =
-            part.input && typeof part.input === "object" && !Array.isArray(part.input)
-              ? (part.input as Record<string, unknown>)
-              : undefined;
-          return { toolName: part.toolName, toolParams: params };
-        }
-      }
-    }
-    return null;
-  }, [messages]);
-
-  const cancelAllPendingElicitations = () => {
-    setPendingElicitations((prev) => {
-      for (const req of prev) {
-        client.respondToMcpElicitation(req.requestId, { action: "cancel" });
-      }
-      return [];
-    });
-  };
-
-  const handleApproveElicitation = (request: McpElicitationRequest, forSession: boolean) => {
-    if (forSession) {
-      setAutoApproveSession(true);
-    }
-    client.respondToMcpElicitation(request.requestId, {
-      action: "accept",
-      persist: forSession && request.persistOptions.includes("session") ? "session" : undefined,
-    });
-    setPendingElicitations((prev) => prev.filter((item) => item.requestId !== request.requestId));
-  };
-
-  const handleDeclineElicitation = (request: McpElicitationRequest) => {
-    client.respondToMcpElicitation(request.requestId, { action: "decline" });
-    setPendingElicitations((prev) => prev.filter((item) => item.requestId !== request.requestId));
-  };
-
   const handleConnect = async () => {
-    const nextUrl = wsUrlInput.trim() || DEFAULT_CODEX_WS_URL;
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEY_WS_URL, nextUrl);
-    }
-    client.setUrl(nextUrl);
-    clearError();
-    try {
-      await client.connect();
+    const ok = await connect();
+    if (ok) {
       setShowSettings(false);
-    } catch {
-      // Status state already reflects the error
     }
-  };
-
-  const handleResetChat = () => {
-    cancelAllPendingElicitations();
-    setAutoApproveSession(false);
-    if (isStreaming) {
-      void stop();
-    }
-    client.resetThread();
-    setMessages([]);
-    clearError();
-  };
-
-  const handleStop = () => {
-    cancelAllPendingElicitations();
-    void stop();
   };
 
   const handleSendText = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || isStreaming) return;
     setInput("");
-    clearError();
-    await sendMessage({ text: trimmed });
+    await sendPrompt(trimmed);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -268,7 +123,7 @@ export function A2UIChatPanel({
         onWsUrlChange={setWsUrlInput}
         onToggleSettings={() => setShowSettings((prev) => !prev)}
         onConnect={() => void handleConnect()}
-        onResetChat={handleResetChat}
+        onResetChat={resetChat}
       />
 
       {/* Conversation */}
@@ -318,9 +173,9 @@ export function A2UIChatPanel({
                 fallbackToolName={activeRunningTool?.toolName}
                 fallbackToolParams={activeRunningTool?.toolParams}
                 dataModel={dataModel}
-                onApprove={() => handleApproveElicitation(request, false)}
-                onApproveSession={() => handleApproveElicitation(request, true)}
-                onDecline={() => handleDeclineElicitation(request)}
+                onApprove={() => approveElicitation(request, false)}
+                onApproveSession={() => approveElicitation(request, true)}
+                onDecline={() => declineElicitation(request)}
               />
             ))}
 
@@ -404,7 +259,7 @@ export function A2UIChatPanel({
                 size="icon"
                 className="size-7 rounded-md"
                 aria-label="停止"
-                onClick={handleStop}
+                onClick={stopStreaming}
               >
                 <Square className="size-3 fill-current" />
               </Button>

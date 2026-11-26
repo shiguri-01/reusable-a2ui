@@ -1,9 +1,9 @@
 import { Check, ShieldAlert, Trash2, X } from "lucide-react";
-import type { DataModel } from "@/a2ui/data-model";
+import type { DataModel } from "@/features/a2ui/data-model";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { McpElicitationRequest } from "@/lib/codex/client";
-import { formatYen, type ExpenseItem } from "@/lib/expenses";
+import type { McpElicitationRequest } from "@/features/ai-chat/codex/client";
+import { formatYen, type ExpenseItem } from "@/features/expenses/model";
 
 interface McpApprovalCardProps {
   request: McpElicitationRequest;

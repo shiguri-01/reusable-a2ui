@@ -1,7 +1,7 @@
 import { Check, Code2, Columns2, Eye, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { CompareMode } from "./types";
+import type { CompareMode } from "../types";
 
 interface PreviewCompareDockProps {
   compareMode: CompareMode;

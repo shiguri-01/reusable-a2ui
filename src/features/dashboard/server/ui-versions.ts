@@ -1,8 +1,8 @@
 import { asc, db, desc, eq } from "void/db";
 import { uiVersions, type UiVersion } from "@schema";
-import { PRESET_UI_VERSIONS } from "@/a2ui/presets";
-import { DASHBOARD_SURFACE_ID, type A2UIMessage } from "@/a2ui/types";
-import { validateA2UISurfaceMessages } from "@/a2ui/validate";
+import { PRESET_UI_VERSIONS } from "@/features/a2ui/presets";
+import { DASHBOARD_SURFACE_ID, type A2UIMessage } from "@/features/a2ui/types";
+import { validateA2UISurfaceMessages } from "@/features/a2ui/validate";
 
 export async function ensureDefaultUiVersions(): Promise<UiVersion[]> {
   const existing = await db

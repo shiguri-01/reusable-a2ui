@@ -1,5 +1,5 @@
 import type { ChatRequestOptions, ChatTransport, UIMessage, UIMessageChunk } from "ai";
-import { extractDashboardDraft, type DashboardDraft } from "@/a2ui/draft";
+import { extractDashboardDraft, type DashboardDraft } from "@/features/a2ui/draft";
 import type { CodexAppServerClient } from "./client";
 
 const MUTATING_TOOL_NAMES = new Set([

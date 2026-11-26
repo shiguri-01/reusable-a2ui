@@ -1,5 +1,5 @@
 import type { UIMessage } from "ai";
-import type { DashboardDraft } from "@/a2ui/draft";
+import type { DashboardDraft } from "@/features/a2ui/draft";
 
 export type AiPreviewDraft = DashboardDraft;
 

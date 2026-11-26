@@ -1,4 +1,4 @@
-import type { DataModel } from "@/a2ui/data-model";
+import type { DataModel } from "@/features/a2ui/data-model";
 
 export const EXPENSE_CATEGORIES = ["食費", "カフェ", "日用品", "交通", "娯楽", "その他"] as const;
 

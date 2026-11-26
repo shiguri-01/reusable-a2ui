@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { buildSurfaceState, getByPath, type DataModel } from "@/a2ui/data-model";
-import { A2UISurface } from "@/a2ui/renderer";
-import type { A2UIAction, A2UIMessage } from "@/a2ui/types";
-import { EXPENSE_CATEGORIES, getTodayIso } from "@/lib/expenses";
+import { buildSurfaceState, getByPath, type DataModel } from "@/features/a2ui/data-model";
+import { A2UISurface } from "@/features/a2ui/components/a2ui-surface";
+import type { A2UIAction, A2UIMessage } from "@/features/a2ui/types";
+import { EXPENSE_CATEGORIES, getTodayIso } from "@/features/expenses/model";
 
 interface InlineA2UICardProps {
   messages: A2UIMessage[];

@@ -3,13 +3,13 @@ import { ValidationError } from "void/handler";
 import { db, desc, eq } from "void/db";
 import { expenses, insertExpenseSchema } from "@schema";
 import { z } from "zod";
-import { DASHBOARD_SURFACE_ID } from "@/a2ui/types";
-import { validateA2UISurfaceMessages } from "@/a2ui/validate";
+import { DASHBOARD_SURFACE_ID } from "@/features/a2ui/types";
+import { validateA2UISurfaceMessages } from "@/features/a2ui/validate";
 import {
   activateUiVersionById,
   createAndActivateUiVersion,
   ensureDefaultUiVersions,
-} from "@/lib/ui-versions";
+} from "@/features/dashboard/server/ui-versions";
 
 export type Props = InferProps<typeof loader>;
 

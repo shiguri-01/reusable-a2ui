@@ -1,4 +1,4 @@
-import { EXPENSE_CATEGORIES, getTodayIso } from "@/lib/expenses";
+import { EXPENSE_CATEGORIES, getTodayIso } from "@/features/expenses/model";
 import { CHAT_INLINE_SURFACE_ID, DASHBOARD_SURFACE_ID, EXPENSE_CATALOG_ID } from "./types";
 
 export function buildA2UIDeveloperInstructions(): string {

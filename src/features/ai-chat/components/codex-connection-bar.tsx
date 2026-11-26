@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Check, Copy, Plug, PlugZap, RotateCcw, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DEFAULT_CODEX_WS_URL, type CodexClientStatus } from "@/lib/codex/client";
+import { DEFAULT_CODEX_WS_URL, type CodexClientStatus } from "@/features/ai-chat/codex/client";
 import { cn } from "@/lib/utils";
 
 const SERVER_START_COMMAND = "vp run codex:server";
