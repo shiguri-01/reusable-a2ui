@@ -6,9 +6,11 @@ import type { CodexAppServerClient } from "./client";
 export interface CodexChatTransportOptions {
   client: CodexAppServerClient;
   getDeveloperInstructions: () => string;
-  formatUserPrompt: (userText: string) => string;
+  prepareTurn: (userText: string) => {
+    text: string;
+    onDashboardProposed?: (proposal: DashboardDraft) => void;
+  };
   onDataMutated?: (toolName: string) => void;
-  onDashboardProposed?: (proposal: DashboardDraft) => void;
   effort?: "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
 }
 
@@ -82,17 +84,15 @@ function extractLastUserText(messages: UIMessage[]): string {
 export class CodexChatTransport implements ChatTransport<UIMessage> {
   private readonly client: CodexAppServerClient;
   private readonly getDeveloperInstructions: () => string;
-  private readonly formatUserPrompt: (userText: string) => string;
+  private readonly prepareTurn: CodexChatTransportOptions["prepareTurn"];
   private readonly onDataMutated?: (toolName: string) => void;
-  private readonly onDashboardProposed?: (proposal: DashboardDraft) => void;
   private readonly effort: "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
   constructor(options: CodexChatTransportOptions) {
     this.client = options.client;
     this.getDeveloperInstructions = options.getDeveloperInstructions;
-    this.formatUserPrompt = options.formatUserPrompt;
+    this.prepareTurn = options.prepareTurn;
     this.onDataMutated = options.onDataMutated;
-    this.onDashboardProposed = options.onDashboardProposed;
     this.effort = options.effort ?? "low";
   }
 
@@ -110,6 +110,7 @@ export class CodexChatTransport implements ChatTransport<UIMessage> {
       throw new Error("メッセージが空です");
     }
 
+    const { text: promptText, onDashboardProposed } = this.prepareTurn(rawUserText);
     await this.client.connect();
 
     let threadId = this.client.getStatus().threadId;
@@ -120,13 +121,13 @@ export class CodexChatTransport implements ChatTransport<UIMessage> {
       threadId = started.thread.id;
     }
 
-    const promptText = this.formatUserPrompt(rawUserText);
     const { abortSignal } = options;
 
     return new ReadableStream<UIMessageChunk>({
       start: async (controller) => {
         let activeTurnId: string | null = null;
         let closed = false;
+        let latestProposal: DashboardDraft | null = null;
         const startedTextIds = new Set<string>();
         const startedReasoningIds = new Set<string>();
         const startedToolCallIds = new Set<string>();
@@ -232,7 +233,7 @@ export class CodexChatTransport implements ChatTransport<UIMessage> {
             if (toolName === "propose_dashboard_ui") {
               const proposal = extractDashboardDraft(toolCallId, output);
               if (proposal) {
-                this.onDashboardProposed?.(proposal);
+                latestProposal = proposal;
               }
             }
             if (MUTATING_MCP_TOOL_NAMES.has(toolName)) {
@@ -278,6 +279,10 @@ export class CodexChatTransport implements ChatTransport<UIMessage> {
                   safeEnqueue({ type: "text-delta", id, delta: item.text });
                 }
               }
+            }
+
+            if (turn?.status === "completed" && latestProposal && !abortSignal?.aborted) {
+              onDashboardProposed?.(latestProposal);
             }
 
             finish(

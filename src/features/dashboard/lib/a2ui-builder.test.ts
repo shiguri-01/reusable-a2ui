@@ -12,6 +12,7 @@ import {
   updateComponent,
 } from "./a2ui-builder";
 import { BLOCK_BLUEPRINTS, getComponentDisplayParts } from "./catalog-registry";
+import { matchesProposalBase } from "./ai-proposal";
 
 describe("a2ui-builder operations", () => {
   const baseV3 = PRESET_UI_VERSIONS[2]!.messages;
@@ -88,4 +89,15 @@ it("falls back to the block type when a text binding resolves to a number", () =
     primary: "¥1,200",
     secondary: "テキスト",
   });
+});
+
+it("recognizes the AI request's base only while the version and draft snapshot still match", () => {
+  const messages = PRESET_UI_VERSIONS[2]!.messages;
+  const base = { messages, versionId: 3 };
+  const editedMessages = moveComponentRelative(messages, "budget-card", "up");
+
+  expect(matchesProposalBase(base, { messages, versionId: 3 })).toBe(true);
+  expect(matchesProposalBase(base, { messages: editedMessages, versionId: 3 })).toBe(false);
+  expect(matchesProposalBase(base, { messages, versionId: 4 })).toBe(false);
+  expect(matchesProposalBase(undefined, base)).toBe(false);
 });

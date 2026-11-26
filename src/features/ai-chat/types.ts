@@ -1,9 +1,13 @@
 import type { UIMessage } from "ai";
 import type { DashboardDraft } from "@/features/a2ui/draft";
+import type { A2UIMessage } from "@/features/a2ui/types";
 
 export type AiPreviewDraft = DashboardDraft;
 
-export type CompareMode = "preview" | "current" | "split";
+export interface DashboardEditBase {
+  versionId: number | undefined;
+  messages: A2UIMessage[];
+}
 
 export function getMessageText(message: UIMessage): string {
   return message.parts

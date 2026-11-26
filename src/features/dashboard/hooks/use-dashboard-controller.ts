@@ -8,7 +8,7 @@ import {
   type A2UIComponent,
   type A2UIMessage,
 } from "@/features/a2ui/types";
-import type { AiPreviewDraft, CompareMode } from "@/features/ai-chat/types";
+import type { AiPreviewDraft, DashboardEditBase } from "@/features/ai-chat/types";
 import { runExpenseA2UIAction, type ExpenseActionResult } from "@/features/expenses/actions";
 import {
   ALL_CATEGORY_LABEL,
@@ -30,6 +30,7 @@ import {
   type BlockBlueprint,
   type EditableSurfaceGraph,
 } from "../lib/a2ui-builder";
+import { matchesProposalBase, type DashboardProposal } from "../lib/ai-proposal";
 
 export interface DashboardFeedback {
   type: "error" | "success";
@@ -47,6 +48,7 @@ export interface DashboardBuilderState {
   selectedId: string | null;
   canvasMode: BuilderCanvasMode;
   isDirty: boolean;
+  canSave: boolean;
   canUndo: boolean;
   canRedo: boolean;
   resetEpoch: number;
@@ -79,10 +81,21 @@ export interface DashboardBuilderActions {
   saveAsNewVersion: (input: { name: string; description: string }) => Promise<boolean>;
 }
 
+interface DraftOrigin {
+  label: string;
+  proposal?: Pick<AiPreviewDraft, "draftId" | "description">;
+}
+
+interface DraftSnapshot {
+  messages: A2UIMessage[];
+  origin?: DraftOrigin;
+  invalidJson?: { text: string; error: string };
+}
+
 interface DraftHistoryState {
-  past: A2UIMessage[][];
-  present: A2UIMessage[];
-  future: A2UIMessage[][];
+  past: DraftSnapshot[];
+  present: DraftSnapshot;
+  future: DraftSnapshot[];
   resetEpoch: number;
 }
 
@@ -138,7 +151,7 @@ export function useDashboardController({
   const [syncedVersionId, setSyncedVersionId] = useState<number | undefined>(activeVersion?.id);
   const [history, setHistory] = useState<DraftHistoryState>(() => ({
     past: [],
-    present: activeMessages,
+    present: { messages: activeMessages },
     future: [],
     resetEpoch: 0,
   }));
@@ -149,25 +162,22 @@ export function useDashboardController({
   const [paletteTargetParentId, setPaletteTargetParentId] = useState<string>("root");
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveServerError, setSaveServerError] = useState<string | null>(null);
-  const [baseOriginLabel, setBaseOriginLabel] = useState<string | null>(null);
 
   // Sync builder baseline whenever the active version ID changes externally (e.g. version switch or save).
   if (activeVersion?.id !== syncedVersionId) {
     setSyncedVersionId(activeVersion?.id);
     setHistory((prev) => ({
       past: [],
-      present: activeMessages,
+      present: { messages: activeMessages },
       future: [],
       resetEpoch: prev.resetEpoch + 1,
     }));
     setRawJson(canonicalActiveJson);
     setJsonError(null);
     setSelectedId(null);
-    setBaseOriginLabel(null);
   }
 
-  const [previewDraft, setPreviewDraft] = useState<AiPreviewDraft | null>(null);
-  const [compareMode, setCompareMode] = useState<CompareMode>("preview");
+  const [proposal, setProposal] = useState<DashboardProposal | null>(null);
   const [appliedDraftIds, setAppliedDraftIds] = useState<Record<string, boolean>>({});
 
   const dataModel = useMemo(
@@ -179,30 +189,39 @@ export function useDashboardController({
     [expenses, formState, filterState],
   );
 
-  const draftGraph = useMemo(() => extractEditableSurface(history.present), [history.present]);
-  const canonicalDraftJson = useMemo(
-    () => JSON.stringify(history.present, null, 2),
-    [history.present],
-  );
+  const draftMessages = history.present.messages;
+  const draftGraph = useMemo(() => extractEditableSurface(draftMessages), [draftMessages]);
+  const canonicalDraftJson = useMemo(() => JSON.stringify(draftMessages, null, 2), [draftMessages]);
   const isDirty = canonicalDraftJson !== canonicalActiveJson || jsonError !== null;
+
+  const captureDraft = (snapshot: DraftSnapshot): DraftSnapshot => ({
+    ...snapshot,
+    invalidJson: jsonError ? { text: rawJson, error: jsonError } : undefined,
+  });
 
   const commitBuilderMessages = (
     nextMessages: A2UIMessage[],
-    options?: { bumpEpoch?: boolean },
+    options?: { bumpEpoch?: boolean; origin?: DraftOrigin | null; rawJson?: string },
   ) => {
     const nextJson = JSON.stringify(nextMessages, null, 2);
     setHistory((prev) => {
-      if (JSON.stringify(prev.present) === JSON.stringify(nextMessages)) {
+      const origin =
+        options?.origin === undefined ? prev.present.origin : (options.origin ?? undefined);
+      if (
+        origin === prev.present.origin &&
+        JSON.stringify(prev.present.messages) === JSON.stringify(nextMessages)
+      ) {
         return prev;
       }
+      const previous = options?.origin?.proposal ? captureDraft(prev.present) : prev.present;
       return {
-        past: [...prev.past.slice(-(MAX_HISTORY_STEPS - 1)), prev.present],
-        present: nextMessages,
+        past: [...prev.past.slice(-(MAX_HISTORY_STEPS - 1)), previous],
+        present: { messages: nextMessages, origin },
         future: [],
         resetEpoch: options?.bumpEpoch ? prev.resetEpoch + 1 : prev.resetEpoch,
       };
     });
-    setRawJson(nextJson);
+    setRawJson(options?.rawJson ?? nextJson);
     setJsonError(null);
   };
 
@@ -211,38 +230,37 @@ export function useDashboardController({
     const previous = history.past[history.past.length - 1]!;
     setHistory((prev) => ({
       past: prev.past.slice(0, -1),
-      present: previous,
-      future: [prev.present, ...prev.future],
+      present: { messages: previous.messages, origin: previous.origin },
+      future: [captureDraft(prev.present), ...prev.future],
       resetEpoch: prev.resetEpoch + 1,
     }));
-    setRawJson(JSON.stringify(previous, null, 2));
-    setJsonError(null);
+    setRawJson(previous.invalidJson?.text ?? JSON.stringify(previous.messages, null, 2));
+    setJsonError(previous.invalidJson?.error ?? null);
   };
 
   const redo = () => {
     if (history.future.length === 0) return;
     const next = history.future[0]!;
     setHistory((prev) => ({
-      past: [...prev.past, prev.present],
-      present: next,
+      past: [...prev.past, captureDraft(prev.present)],
+      present: { messages: next.messages, origin: next.origin },
       future: prev.future.slice(1),
       resetEpoch: prev.resetEpoch + 1,
     }));
-    setRawJson(JSON.stringify(next, null, 2));
-    setJsonError(null);
+    setRawJson(next.invalidJson?.text ?? JSON.stringify(next.messages, null, 2));
+    setJsonError(next.invalidJson?.error ?? null);
   };
 
   const resetDraft = () => {
     setHistory((prev) => ({
       past: [],
-      present: activeMessages,
+      present: { messages: activeMessages },
       future: [],
       resetEpoch: prev.resetEpoch + 1,
     }));
     setRawJson(canonicalActiveJson);
     setJsonError(null);
     setSelectedId(null);
-    setBaseOriginLabel(null);
   };
 
   const resolveDefaultInsertPlacement = (explicitParentId?: string) => {
@@ -275,7 +293,7 @@ export function useDashboardController({
       ? { parentId }
       : resolveDefaultInsertPlacement(paletteTargetParentId);
     const { messages: nextMessages, insertedId } = insertBlockIntoMessages(
-      history.present,
+      draftMessages,
       blueprint,
       placement,
     );
@@ -284,22 +302,22 @@ export function useDashboardController({
   };
 
   const updateNode = (nodeId: string, next: A2UIComponent) => {
-    const nextMessages = updateComponent(history.present, nodeId, () => next);
+    const nextMessages = updateComponent(draftMessages, nodeId, () => next);
     commitBuilderMessages(nextMessages);
   };
 
   const moveNode = (activeId: string, targetParentId: string, targetIndex?: number) => {
-    const nextMessages = moveComponent(history.present, activeId, targetParentId, targetIndex);
+    const nextMessages = moveComponent(draftMessages, activeId, targetParentId, targetIndex);
     commitBuilderMessages(nextMessages, { bumpEpoch: true });
   };
 
   const moveNodeRelative = (nodeId: string, direction: "up" | "down") => {
-    const nextMessages = moveComponentRelative(history.present, nodeId, direction);
+    const nextMessages = moveComponentRelative(draftMessages, nodeId, direction);
     commitBuilderMessages(nextMessages, { bumpEpoch: true });
   };
 
   const duplicateNode = (nodeId: string) => {
-    const { messages: nextMessages, duplicatedId } = duplicateComponent(history.present, nodeId);
+    const { messages: nextMessages, duplicatedId } = duplicateComponent(draftMessages, nodeId);
     commitBuilderMessages(nextMessages);
     if (duplicatedId) {
       setSelectedId(duplicatedId);
@@ -307,7 +325,7 @@ export function useDashboardController({
   };
 
   const deleteNode = (nodeId: string) => {
-    const nextMessages = removeComponent(history.present, nodeId);
+    const nextMessages = removeComponent(draftMessages, nodeId);
     commitBuilderMessages(nextMessages);
     if (selectedId === nodeId) {
       setSelectedId(null);
@@ -321,18 +339,7 @@ export function useDashboardController({
       setJsonError(validated.error);
       return;
     }
-    setJsonError(null);
-    setHistory((prev) => {
-      if (JSON.stringify(prev.present) === JSON.stringify(validated.messages)) {
-        return prev;
-      }
-      return {
-        past: [...prev.past.slice(-(MAX_HISTORY_STEPS - 1)), prev.present],
-        present: validated.messages,
-        future: [],
-        resetEpoch: prev.resetEpoch + 1,
-      };
-    });
+    commitBuilderMessages(validated.messages, { bumpEpoch: true, rawJson: nextJson });
   };
 
   const formatRawJson = () => {
@@ -349,10 +356,12 @@ export function useDashboardController({
       setFeedback({ type: "error", message: validated.error });
       return;
     }
-    commitBuilderMessages(validated.messages, { bumpEpoch: true });
+    commitBuilderMessages(validated.messages, {
+      bumpEpoch: true,
+      origin: baseLabel ? { label: baseLabel } : null,
+    });
     setSelectedId(null);
-    setBaseOriginLabel(baseLabel ?? null);
-    setPreviewDraft(null);
+    setProposal(null);
     setCanvasMode("edit");
   };
 
@@ -414,17 +423,21 @@ export function useDashboardController({
         setFeedback({ type: "error", message: res.error.message });
         return;
       }
-      setPreviewDraft(null);
+      setProposal(null);
     } finally {
       setPending(false);
     }
   };
 
   const nextVersionNumber = uiVersions.reduce((max, v) => Math.max(max, v.version), 0) + 1;
-  const suggestedVersionName = baseOriginLabel
-    ? `v${nextVersionNumber}：${baseOriginLabel.replace(/^v\d+[：:]\s*/, "")}（カスタム）`
-    : `v${nextVersionNumber}：カスタムダッシュボード`;
-  const suggestedDescription = baseOriginLabel ? `${baseOriginLabel} をベースに調整` : "";
+  const origin = history.present.origin;
+  const suggestedVersionName = origin?.proposal
+    ? origin.label
+    : origin
+      ? `v${nextVersionNumber}：${origin.label.replace(/^v\d+[：:]\s*/, "")}（カスタム）`
+      : `v${nextVersionNumber}：カスタムダッシュボード`;
+  const suggestedDescription =
+    origin?.proposal?.description ?? (origin ? `${origin.label} をベースに調整` : "");
 
   const saveAsNewVersion = async (input: {
     name: string;
@@ -436,7 +449,7 @@ export function useDashboardController({
       return false;
     }
     const name = input.name.trim() || suggestedVersionName;
-    const messagesJson = JSON.stringify(history.present, null, 2);
+    const proposalId = origin?.proposal?.draftId;
 
     setPending(true);
     try {
@@ -444,14 +457,18 @@ export function useDashboardController({
         data: {
           name,
           description: input.description.trim(),
-          messagesJson,
+          messagesJson: canonicalDraftJson,
         },
       });
       if (!res.ok) {
         setSaveServerError(res.error.message);
         return false;
       }
-      setFeedback({ type: "success", message: `新しいUIバージョン「${name}」を保存しました。` });
+      if (proposalId) {
+        setAppliedDraftIds((prev) => ({ ...prev, [proposalId]: true }));
+        setProposal((prev) => (prev?.draft.draftId === proposalId ? null : prev));
+      }
+      setFeedback({ type: "success", message: `「${name}」を保存しました。` });
       return true;
     } finally {
       setPending(false);
@@ -459,46 +476,54 @@ export function useDashboardController({
   };
 
   const handlePreviewAiVersion = (draft: AiPreviewDraft) => {
-    setPreviewDraft(draft);
-    setCompareMode((prev) => (prev === "current" ? "preview" : prev));
+    setProposal({ draft, mode: "split" });
   };
 
-  const handleApplyAiVersion = async (draft: AiPreviewDraft): Promise<void> => {
+  const setProposalMode = (mode: DashboardProposal["mode"]) => {
+    setProposal((prev) => (prev && prev.mode !== mode ? { ...prev, mode } : prev));
+  };
+
+  const adoptAiProposal = (draft: AiPreviewDraft) => {
+    commitBuilderMessages(draft.messages, {
+      bumpEpoch: true,
+      origin: {
+        label: draft.name,
+        proposal: { draftId: draft.draftId, description: draft.description },
+      },
+    });
+    setProposal(null);
+    setSelectedId(
+      selectedId && extractEditableSurface(draft.messages).componentsById.has(selectedId)
+        ? selectedId
+        : null,
+    );
     setFeedback(null);
-    setPending(true);
-    try {
-      const res = await action("/?saveVersion", {
-        data: {
-          name: draft.name,
-          description: draft.description,
-          messagesJson: draft.messagesJson,
-        },
-      });
-      if (!res.ok) {
-        setFeedback({ type: "error", message: res.error.message });
-        return;
-      }
-      setAppliedDraftIds((prev) => ({ ...prev, [draft.draftId]: true }));
-      setPreviewDraft(null);
-      setCompareMode("preview");
-    } finally {
-      setPending(false);
-    }
   };
 
-  const handleOpenAiJsonInEditor = (messagesJson: string, suggestedName?: string) => {
-    loadFromMessagesJson(messagesJson, suggestedName || "AI提案レイアウト");
-    setCustomizeTab("builder");
+  const receiveAiProposal = (draft: AiPreviewDraft, base?: DashboardEditBase) => {
+    if (
+      matchesProposalBase(base, { messages: draftMessages, versionId: activeVersion?.id }) &&
+      !jsonError &&
+      !saveDialogOpen &&
+      !pending &&
+      !proposal
+    ) {
+      adoptAiProposal(draft);
+      return;
+    }
+    setProposal({ draft, mode: null });
+    setFeedback(null);
   };
 
   const builder: DashboardBuilderState & DashboardBuilderActions = {
-    messages: history.present,
+    messages: draftMessages,
     graph: draftGraph,
     rawJson,
     jsonError,
     selectedId,
     canvasMode,
     isDirty,
+    canSave: isDirty && !jsonError && !pending,
     canUndo: history.past.length > 0,
     canRedo: history.future.length > 0,
     resetEpoch: history.resetEpoch,
@@ -540,17 +565,17 @@ export function useDashboardController({
     customizeTab,
     setCustomizeTab,
     builder,
-    previewDraft,
-    compareMode,
-    setCompareMode,
+    proposal,
+    setProposalMode,
     appliedDraftIds,
+    editingDraftId: origin?.proposal?.draftId ?? null,
     handleDataModelChange,
     executeExpenseAction,
     handleAction,
     handleActivateVersion,
     handlePreviewAiVersion,
-    handleApplyAiVersion,
-    handleOpenAiJsonInEditor,
-    handleDiscardPreview: () => setPreviewDraft(null),
+    adoptAiProposal,
+    receiveAiProposal,
+    handleDiscardPreview: () => setProposal(null),
   };
 }

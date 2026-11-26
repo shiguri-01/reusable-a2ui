@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useShortcut } from "@ui-sdk/react/shortcuts";
-import { ChevronDown } from "lucide-react";
+import { Bot, ChevronDown } from "lucide-react";
 import type { DataModel } from "@/features/a2ui/data-model";
+import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type {
   DashboardBuilderActions,
@@ -14,6 +14,7 @@ import { StructureOutline } from "./structure-outline";
 interface VisualBuilderPanelProps {
   builder: DashboardBuilderState & DashboardBuilderActions;
   dataModel: DataModel;
+  onAskAssistant: () => void;
 }
 
 function BuilderSectionTrigger({ label }: { label: string }) {
@@ -30,75 +31,13 @@ function BuilderSectionTrigger({ label }: { label: string }) {
   );
 }
 
-function isEditableTextTarget(): boolean {
-  if (typeof document === "undefined") return false;
-  const el = document.activeElement;
-  if (!el) return false;
-  const tag = el.tagName.toLowerCase();
-  return tag === "input" || tag === "textarea" || (el as HTMLElement).isContentEditable;
-}
-
-export function VisualBuilderPanel({ builder, dataModel }: VisualBuilderPanelProps) {
+export function VisualBuilderPanel({
+  builder,
+  dataModel,
+  onAskAssistant,
+}: VisualBuilderPanelProps) {
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [layersOpen, setLayersOpen] = useState(true);
-
-  useShortcut("mod+k", () => {
-    builder.openPalette();
-  });
-
-  useShortcut(
-    "mod+z",
-    () => {
-      builder.undo();
-    },
-    {
-      when: () => builder.canUndo && !isEditableTextTarget(),
-    },
-  );
-
-  useShortcut(
-    "mod+shift+z",
-    () => {
-      builder.redo();
-    },
-    {
-      when: () => builder.canRedo && !isEditableTextTarget(),
-    },
-  );
-
-  useShortcut(
-    "escape",
-    () => {
-      builder.setSelectedId(null);
-    },
-    {
-      when: () => builder.selectedId !== null && !builder.paletteOpen && !builder.saveDialogOpen,
-    },
-  );
-
-  useShortcut(
-    "backspace",
-    () => {
-      if (builder.selectedId && builder.selectedId !== builder.graph.rootId) {
-        builder.deleteNode(builder.selectedId);
-      }
-    },
-    {
-      when: () => Boolean(builder.selectedId && builder.selectedId !== builder.graph.rootId),
-    },
-  );
-
-  useShortcut(
-    "delete",
-    () => {
-      if (builder.selectedId && builder.selectedId !== builder.graph.rootId) {
-        builder.deleteNode(builder.selectedId);
-      }
-    },
-    {
-      when: () => Boolean(builder.selectedId && builder.selectedId !== builder.graph.rootId),
-    },
-  );
 
   const selectedNode = builder.selectedId
     ? builder.graph.componentsById.get(builder.selectedId)
@@ -115,18 +54,30 @@ export function VisualBuilderPanel({ builder, dataModel }: VisualBuilderPanelPro
         <BuilderSectionTrigger label="プロパティ" />
         <CollapsibleContent className="px-4 pt-1 pb-4">
           {selectedNode ? (
-            <ComponentInspector
-              key={`${selectedNode.id}:${builder.resetEpoch}`}
-              node={selectedNode}
-              graph={builder.graph}
-              dataModel={dataModel}
-              onSelectNode={builder.setSelectedId}
-              onUpdateNode={builder.updateNode}
-              onMoveRelative={builder.moveNodeRelative}
-              onDuplicate={builder.duplicateNode}
-              onDelete={builder.deleteNode}
-              onRequestAddChild={(parentId) => builder.openPalette(parentId)}
-            />
+            <div className="space-y-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={onAskAssistant}
+              >
+                <Bot className="size-3.5" />
+                このブロックの変更をAIに頼む
+              </Button>
+              <ComponentInspector
+                key={`${selectedNode.id}:${builder.resetEpoch}`}
+                node={selectedNode}
+                graph={builder.graph}
+                dataModel={dataModel}
+                onSelectNode={builder.setSelectedId}
+                onUpdateNode={builder.updateNode}
+                onMoveRelative={builder.moveNodeRelative}
+                onDuplicate={builder.duplicateNode}
+                onDelete={builder.deleteNode}
+                onRequestAddChild={(parentId) => builder.openPalette(parentId)}
+              />
+            </div>
           ) : (
             <p className="text-muted-foreground py-1 text-sm">
               ブロックを選択すると設定を編集できます

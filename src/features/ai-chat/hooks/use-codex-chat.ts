@@ -15,24 +15,26 @@ import {
   type McpElicitationRequest,
 } from "../codex/client";
 import { CodexChatTransport } from "../codex/transport";
-import type { AiPreviewDraft } from "../types";
+import type { AiPreviewDraft, DashboardEditBase } from "../types";
 
 const STORAGE_KEY_WS_URL = "reusable-a2ui:codex-ws-url:v3";
 
 interface UseCodexChatOptions {
   currentPagePath?: string;
   activeVersionName?: string;
-  currentMessagesJson?: string;
+  dashboardEditBase?: DashboardEditBase;
+  selectedBlock?: { id: string; label: string };
   onDataMutated: (toolName: string) => void;
-  onPreviewA2UI: (draft: AiPreviewDraft) => void;
+  onDashboardProposed: (draft: AiPreviewDraft, base?: DashboardEditBase) => void;
 }
 
 export function useCodexChat({
   currentPagePath,
   activeVersionName,
-  currentMessagesJson,
+  dashboardEditBase,
+  selectedBlock,
   onDataMutated,
-  onPreviewA2UI,
+  onDashboardProposed,
 }: UseCodexChatOptions) {
   const [wsUrlInput, setWsUrlInput] = useState(DEFAULT_CODEX_WS_URL);
   const [pendingElicitations, setPendingElicitations] = useState<McpElicitationRequest[]>([]);
@@ -41,20 +43,29 @@ export function useCodexChat({
   const transportCallbacksRef = useRef({
     currentPagePath,
     activeVersionName,
-    currentMessagesJson,
+    dashboardEditBase,
+    selectedBlock,
     onDataMutated,
-    onPreviewA2UI,
+    onDashboardProposed,
   });
 
   useEffect(() => {
     transportCallbacksRef.current = {
       currentPagePath,
       activeVersionName,
-      currentMessagesJson,
+      dashboardEditBase,
+      selectedBlock,
       onDataMutated,
-      onPreviewA2UI,
+      onDashboardProposed,
     };
-  }, [currentPagePath, activeVersionName, currentMessagesJson, onDataMutated, onPreviewA2UI]);
+  }, [
+    currentPagePath,
+    activeVersionName,
+    dashboardEditBase,
+    selectedBlock,
+    onDataMutated,
+    onDashboardProposed,
+  ]);
 
   const client = useMemo(() => new CodexAppServerClient(DEFAULT_CODEX_WS_URL), []);
 
@@ -128,15 +139,24 @@ export function useCodexChat({
       new CodexChatTransport({
         client,
         getDeveloperInstructions: buildA2UIDeveloperInstructions,
-        formatUserPrompt: (userText) =>
-          buildUserTurnPrompt({
-            userText,
-            currentPagePath: transportCallbacksRef.current.currentPagePath,
-            activeVersionName: transportCallbacksRef.current.activeVersionName,
-            currentMessagesJson: transportCallbacksRef.current.currentMessagesJson,
-          }),
+        prepareTurn: (userText) => {
+          const { dashboardEditBase, currentPagePath, activeVersionName, selectedBlock } =
+            transportCallbacksRef.current;
+          return {
+            text: buildUserTurnPrompt({
+              userText,
+              currentPagePath,
+              activeVersionName,
+              selectedBlock,
+              currentMessagesJson: dashboardEditBase
+                ? JSON.stringify(dashboardEditBase.messages, null, 2)
+                : undefined,
+            }),
+            onDashboardProposed: (proposal) =>
+              transportCallbacksRef.current.onDashboardProposed(proposal, dashboardEditBase),
+          };
+        },
         onDataMutated: (toolName) => transportCallbacksRef.current.onDataMutated(toolName),
-        onDashboardProposed: (proposal) => transportCallbacksRef.current.onPreviewA2UI(proposal),
         effort: "low",
       }),
     [client],

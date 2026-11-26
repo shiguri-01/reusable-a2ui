@@ -18,6 +18,7 @@ interface ChatMessageItemProps {
   isStreamingThis: boolean;
   activePreviewDraftId: string | null;
   appliedDraftIds: Record<string, boolean>;
+  editingDraftId: string | null;
   onExpenseAction: (
     action: A2UIAction,
     formValues: Record<string, unknown>,
@@ -33,6 +34,7 @@ export function ChatMessageItem({
   isStreamingThis,
   activePreviewDraftId,
   appliedDraftIds,
+  editingDraftId,
   onExpenseAction,
   onSendPrompt,
   onPreview,
@@ -80,6 +82,7 @@ export function ChatMessageItem({
               part={part}
               activePreviewDraftId={activePreviewDraftId}
               appliedDraftIds={appliedDraftIds}
+              editingDraftId={editingDraftId}
               onPreview={onPreview}
             />
           ))}

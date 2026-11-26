@@ -1,4 +1,4 @@
-import { Code2, History, RotateCcw, Save, SlidersHorizontal } from "lucide-react";
+import { Code2, History, RotateCcw, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SidebarContent, SidebarFooter } from "@/components/ui/sidebar";
@@ -6,11 +6,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { DashboardSidebarHost } from "@/features/ai-chat/context/assistant-context";
 import type { CustomizePanelTab } from "../hooks/use-dashboard-controller";
 import { JsonEditorPanel } from "./json-editor-panel";
-import { CanvasModeControl, UndoRedoButtons } from "./builder-controls";
+import { CanvasModeControl, SaveVersionButton, UndoRedoButtons } from "./builder-controls";
 import { VersionHistoryPanel } from "./version-history-panel";
 import { VisualBuilderPanel } from "./visual-builder-panel";
 
-export function DashboardCustomizePanel({ host }: { host: DashboardSidebarHost }) {
+export function DashboardCustomizePanel({
+  host,
+  onAskAssistant,
+}: {
+  host: DashboardSidebarHost;
+  onAskAssistant: () => void;
+}) {
   const {
     customizeTab,
     onChangeCustomizeTab,
@@ -56,7 +62,11 @@ export function DashboardCustomizePanel({ host }: { host: DashboardSidebarHost }
       <SidebarContent className="overflow-hidden">
         <ScrollArea className="min-h-0 flex-1">
           <TabsContent value="builder" className="mt-0">
-            <VisualBuilderPanel builder={builder} dataModel={dataModel} />
+            <VisualBuilderPanel
+              builder={builder}
+              dataModel={dataModel}
+              onAskAssistant={onAskAssistant}
+            />
           </TabsContent>
           <TabsContent value="json" className="mt-0 p-4">
             <JsonEditorPanel
@@ -83,15 +93,11 @@ export function DashboardCustomizePanel({ host }: { host: DashboardSidebarHost }
 
       {isEditingSurface && (
         <SidebarFooter className="border-t px-4 py-3">
-          <Button
-            type="button"
+          <SaveVersionButton
             className="w-full"
-            disabled={pending || Boolean(builder.jsonError) || !builder.isDirty}
+            disabled={!builder.canSave}
             onClick={() => builder.setSaveDialogOpen(true)}
-          >
-            <Save className="size-4" />
-            新バージョンとして保存
-          </Button>
+          />
         </SidebarFooter>
       )}
     </Tabs>

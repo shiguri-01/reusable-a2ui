@@ -13,7 +13,8 @@ export function buildA2UIDeveloperInstructions(): string {
     "- create_expenses: 1件〜複数件の支出をまとめて登録する。複数項目を言われたら1回の呼び出しにまとめる。日付指定がなければ省略（今日の日付が自動設定される）。",
     "- update_expense: 既存の支出を ID 指定で部分更新する（ID が不明なら先に list_expenses で調べる）。",
     "- delete_expenses: 既存の支出を ID 指定で削除する（ID が不明なら先に list_expenses で対象を特定してから削除する）。",
-    "- propose_dashboard_ui: ユーザーがダッシュボード画面のレイアウト変更・改善を求めたときに呼ぶ。画面上にライブプレビュー（Before/After 比較・適用ドック）が表示される。ダッシュボード変更案はチャット本文の ```a2ui-json に書かず、必ずこのツールで提出する。",
+    "- propose_dashboard_ui: ユーザーが画面の変更を求めたときに呼ぶ。依頼時点の下書きをベースに、変更対象外のブロックと既存 ID を保つ。対象ブロックが指定されていれば、そのブロックを中心に変更し、全体を依頼された場合は指定に従う。変更案はこのツールで提出する。ユーザーが確認して保存するまでは、下書きとして扱う。",
+    "- 提案後の返答は変更内容を短く伝える。操作案内が必要なら、画面上部の「プレビュー」「保存」など実際のボタン名を使う。「下書きと比較」が表示されている場合は、「下書きに取り込む」の後に「保存」が使える。",
     "- list_ui_versions / activate_ui_version: 保存済みダッシュボード UI バージョンの確認や、既存バージョンへの切り替えを行う。",
     "- save_ui_version: ユーザーが「プレビューなしで即保存して」と明示した場合のみ使う。",
     "",
@@ -83,6 +84,7 @@ export function buildUserTurnPrompt(options: {
   currentPagePath?: string;
   activeVersionName?: string;
   currentMessagesJson?: string;
+  selectedBlock?: { id: string; label: string };
 }): string {
   const lines = [`今日の日付: ${getTodayIso()}`];
 
@@ -92,12 +94,17 @@ export function buildUserTurnPrompt(options: {
 
   if (options.activeVersionName && options.currentMessagesJson) {
     lines.push(
-      `現在使用中の UI バージョン: ${options.activeVersionName}`,
-      "現在のダッシュボード A2UI JSON:",
+      `ダッシュボードの編集元: ${options.activeVersionName}`,
+      "依頼時点のダッシュボード A2UI JSON:",
       "```json",
       options.currentMessagesJson,
       "```",
+      "画面変更後は変更内容を短く伝える。操作案内が必要な場合は、画面上部の「プレビュー」「保存」など実際のボタン名を使う。「下書きと比較」が表示されている場合は「下書きに取り込む」の後に「保存」が使える。",
     );
+  }
+
+  if (options.selectedBlock) {
+    lines.push(`選択中のブロック: ${JSON.stringify(options.selectedBlock)}`);
   }
 
   lines.push("", "ユーザーからの依頼:", options.userText);

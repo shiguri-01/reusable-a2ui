@@ -19,7 +19,7 @@ import type {
 } from "@/features/dashboard/hooks/use-dashboard-controller";
 import { runExpenseA2UIAction, type ExpenseActionResult } from "@/features/expenses/actions";
 import { buildExpenseDataModel, type ExpenseItem } from "@/features/expenses/model";
-import type { AiPreviewDraft, CompareMode } from "../types";
+import type { AiPreviewDraft, DashboardEditBase } from "../types";
 
 type SidebarPanel = "ai" | "customize";
 
@@ -31,15 +31,14 @@ export interface DashboardSidebarHost {
   dataModel: DataModel;
   pending: boolean;
   builder: DashboardBuilderState & DashboardBuilderActions;
+  isEditing: boolean;
   preview: {
-    draft: AiPreviewDraft | null;
-    compareMode: CompareMode;
+    hasProposal: boolean;
+    activePreviewDraftId: string | null;
     appliedDraftIds: Record<string, boolean>;
+    editingDraftId: string | null;
     onPreview: (draft: AiPreviewDraft) => void;
-    onChangeCompareMode: (mode: CompareMode) => void;
-    onDiscard: () => void;
-    onApply: (draft: AiPreviewDraft) => Promise<void>;
-    onOpenInEditor: (messagesJson: string, suggestedName?: string) => void;
+    onReceive: (draft: AiPreviewDraft, base?: DashboardEditBase) => void;
   };
   onActivateVersion: (versionId: number) => void;
   onExpenseAction: (
@@ -66,6 +65,7 @@ interface AssistantSidebarContextValue {
   ) => Promise<ExpenseActionResult>;
   handleDataMutated: () => void;
   handlePreviewA2UI: (draft: AiPreviewDraft) => void;
+  handleDashboardProposed: (draft: AiPreviewDraft, base?: DashboardEditBase) => void;
   consumePendingPreviewDraft: () => AiPreviewDraft | null;
   requestAssistantPrompt: (text: string) => void;
   consumePendingAssistantPrompt: () => string | null;
@@ -160,6 +160,17 @@ export function AssistantSidebarProvider({ children }: { children: ReactNode }) 
     [dashboardHost, router],
   );
 
+  const handleDashboardProposed = useCallback(
+    (draft: AiPreviewDraft, base?: DashboardEditBase) => {
+      if (dashboardHost) {
+        dashboardHost.preview.onReceive(draft, base);
+      } else {
+        handlePreviewA2UI(draft);
+      }
+    },
+    [dashboardHost, handlePreviewA2UI],
+  );
+
   const consumePendingPreviewDraft = useCallback(() => {
     if (!pendingPreviewDraft) return null;
     const draft = pendingPreviewDraft;
@@ -200,6 +211,7 @@ export function AssistantSidebarProvider({ children }: { children: ReactNode }) 
       executeExpenseAction: dashboardHost?.onExpenseAction ?? executeFallbackExpenseAction,
       handleDataMutated,
       handlePreviewA2UI,
+      handleDashboardProposed,
       consumePendingPreviewDraft,
       requestAssistantPrompt,
       consumePendingAssistantPrompt,
@@ -217,6 +229,7 @@ export function AssistantSidebarProvider({ children }: { children: ReactNode }) 
       executeFallbackExpenseAction,
       handleDataMutated,
       handlePreviewA2UI,
+      handleDashboardProposed,
       consumePendingPreviewDraft,
       requestAssistantPrompt,
       consumePendingAssistantPrompt,

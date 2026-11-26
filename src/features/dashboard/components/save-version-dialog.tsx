@@ -18,7 +18,7 @@ const saveVersionFormSchema = z.object({
   name: z
     .string()
     .trim()
-    .min(1, "バージョン名を入力してください")
+    .min(1, "ビュー名を入力してください")
     .max(80, "80文字以内で入力してください"),
   description: z.string().max(240, "240文字以内で入力してください"),
 });
@@ -71,10 +71,15 @@ export function SaveVersionDialog({
   }, [open, defaultName, defaultDescription, form]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!pending || nextOpen) onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent aria-describedby={undefined} className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-base">新バージョンとして保存</DialogTitle>
+          <DialogTitle className="text-base">変更を保存</DialogTitle>
         </DialogHeader>
 
         <form
@@ -89,7 +94,7 @@ export function SaveVersionDialog({
             {(field) => (
               <Field data-invalid={field.state.meta.errors.length > 0}>
                 <FieldLabel htmlFor="save-version-name" className="text-xs">
-                  バージョン名
+                  ビュー名
                 </FieldLabel>
                 <Input
                   id="save-version-name"
@@ -97,7 +102,7 @@ export function SaveVersionDialog({
                   value={field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
-                  placeholder="例：v4：2カラム予算重視レイアウト"
+                  placeholder="例：予算を重視したレイアウト"
                 />
                 <FieldError errors={field.state.meta.errors} />
               </Field>
@@ -144,7 +149,7 @@ export function SaveVersionDialog({
                   disabled={!canSubmit || pending || Boolean(isSubmitting)}
                 >
                   <Check className="size-4" />
-                  保存して適用
+                  保存
                 </Button>
               )}
             </form.Subscribe>

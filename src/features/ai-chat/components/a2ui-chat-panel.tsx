@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { AlertCircle, ArrowDown, ArrowUp, Loader2, Square } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AlertCircle, ArrowDown, ArrowUp, Eye, Loader2, Square, X } from "lucide-react";
 import { useStickToBottom } from "use-stick-to-bottom";
 import type { DataModel } from "@/features/a2ui/data-model";
 import type { A2UIAction } from "@/features/a2ui/types";
@@ -8,13 +8,10 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import type { useCodexChat } from "../hooks/use-codex-chat";
-import type { AiPreviewDraft, CompareMode } from "../types";
+import type { AiPreviewDraft } from "../types";
 import { ChatMessageItem } from "./chat-message-item";
 import { CodexOfflineBanner } from "./codex-connection-bar";
 import { McpApprovalCard } from "./mcp-approval-card";
-import { PreviewCompareDock } from "./preview-compare-dock";
-
-export type { AiPreviewDraft, CompareMode } from "../types";
 
 const QUICK_PROMPTS = [
   "今月の予算状況と使いすぎているカテゴリを教えて",
@@ -26,35 +23,42 @@ interface A2UIChatPanelProps {
   chat: ReturnType<typeof useCodexChat>;
   dataModel: DataModel;
   saving: boolean;
-  previewDraft: AiPreviewDraft | null;
-  compareMode: CompareMode;
+  activePreviewDraftId: string | null;
+  showDashboardReturn: boolean;
   appliedDraftIds: Record<string, boolean>;
+  editingDraftId: string | null;
+  selectedBlock?: string;
+  onClearSelectedBlock: () => void;
+  focusComposer: boolean;
   onExpenseAction: (
     action: A2UIAction,
     formValues: Record<string, unknown>,
   ) => Promise<{ ok: boolean; message?: string }>;
   onPreviewA2UI: (draft: AiPreviewDraft) => void;
-  onChangeCompareMode?: (mode: CompareMode) => void;
-  onDiscardPreview?: () => void;
-  onApplyA2UI?: (draft: AiPreviewDraft) => Promise<void>;
-  onOpenInEditor?: (messagesJson: string, suggestedName?: string) => void;
+  onViewPreview: () => void;
 }
 
 export function A2UIChatPanel({
   chat,
   dataModel,
   saving,
-  previewDraft,
-  compareMode,
+  activePreviewDraftId,
+  showDashboardReturn,
   appliedDraftIds,
+  editingDraftId,
+  selectedBlock,
+  onClearSelectedBlock,
+  focusComposer,
   onExpenseAction,
   onPreviewA2UI,
-  onChangeCompareMode,
-  onDiscardPreview,
-  onApplyA2UI,
-  onOpenInEditor,
+  onViewPreview,
 }: A2UIChatPanelProps) {
   const [input, setInput] = useState("");
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (focusComposer) composerRef.current?.focus({ preventScroll: true });
+  }, [focusComposer]);
 
   const {
     codexStatus,
@@ -130,8 +134,9 @@ export function A2UIChatPanel({
                   isStreamingThis={
                     message.role === "assistant" && index === messages.length - 1 && isStreaming
                   }
-                  activePreviewDraftId={previewDraft?.draftId ?? null}
+                  activePreviewDraftId={activePreviewDraftId}
                   appliedDraftIds={appliedDraftIds}
+                  editingDraftId={editingDraftId}
                   onExpenseAction={onExpenseAction}
                   onSendPrompt={(text) => void handleSendText(text)}
                   onPreview={onPreviewA2UI}
@@ -187,15 +192,13 @@ export function A2UIChatPanel({
         )}
       </div>
 
-      {previewDraft && onChangeCompareMode && onApplyA2UI && onOpenInEditor && onDiscardPreview && (
-        <PreviewCompareDock
-          compareMode={compareMode}
-          saving={saving}
-          onChangeCompareMode={onChangeCompareMode}
-          onApply={() => void onApplyA2UI(previewDraft)}
-          onOpenInEditor={() => onOpenInEditor(previewDraft.messagesJson, previewDraft.name)}
-          onDiscard={onDiscardPreview}
-        />
+      {showDashboardReturn && (
+        <div className="shrink-0 border-t p-3 md:hidden">
+          <Button type="button" variant="outline" className="w-full" onClick={onViewPreview}>
+            <Eye className="size-4" />
+            ダッシュボードに戻る
+          </Button>
+        </div>
       )}
 
       {/* Composer */}
@@ -220,12 +223,32 @@ export function A2UIChatPanel({
             </Button>
           </div>
         )}
+        {selectedBlock && (
+          <div className="bg-muted inline-flex max-w-full items-center gap-1 rounded-md py-0.5 pr-0.5 pl-2 text-xs">
+            <span className="truncate">対象：{selectedBlock}</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-6"
+              aria-label="対象ブロックを解除"
+              onClick={onClearSelectedBlock}
+            >
+              <X className="size-3.5" />
+            </Button>
+          </div>
+        )}
         <div className="bg-background focus-within:ring-ring relative rounded-lg border focus-within:ring-1">
           <Textarea
+            ref={composerRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="支出の記録・分析や、UI の変更を依頼..."
+            placeholder={
+              focusComposer
+                ? "ダッシュボードをどう変えますか？"
+                : "支出の記録・分析や、UI の変更を依頼..."
+            }
             rows={2}
             className="min-h-[64px] resize-none border-0 pr-11 text-sm shadow-none focus-visible:ring-0"
           />

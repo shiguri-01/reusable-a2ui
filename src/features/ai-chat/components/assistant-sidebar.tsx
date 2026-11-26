@@ -1,6 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Bot, RotateCcw, Settings, Settings2, X } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sidebar, SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -8,6 +7,7 @@ import {
   DashboardCustomizeDraftActions,
   DashboardCustomizePanel,
 } from "@/features/dashboard/components/dashboard-customize-panel";
+import { getComponentDisplayParts } from "@/features/dashboard/lib/catalog-registry";
 import { cn } from "@/lib/utils";
 import type { CodexClientStatus } from "../codex/client";
 import { useAssistantSidebar } from "../context/assistant-context";
@@ -66,6 +66,7 @@ export function AssistantSidebar() {
     dashboardHost,
     activePanel,
     visiblePanel,
+    openPanel,
     togglePanel,
     closePanel,
     dataModel,
@@ -73,34 +74,48 @@ export function AssistantSidebar() {
     executeExpenseAction,
     handleDataMutated,
     handlePreviewA2UI,
+    handleDashboardProposed,
     consumePendingAssistantPrompt,
   } = useAssistantSidebar();
 
   const customizeHost = activePanel === "customize" ? dashboardHost : null;
   const preview = dashboardHost?.preview;
   const activeVersion = dashboardHost?.activeVersion;
-  const activeVersionName = preview?.draft
-    ? `${preview.draft.name} (プレビュー中)`
-    : (activeVersion?.name ?? (dashboardHost ? "v1" : undefined));
-  const currentMessagesJson = dashboardHost
-    ? (preview?.draft?.messagesJson ??
-      (dashboardHost.builder.isDirty && !dashboardHost.builder.jsonError
-        ? dashboardHost.builder.rawJson
-        : activeVersion?.messagesJson) ??
-      "[]")
+  const builder = dashboardHost?.builder;
+  const selectedNode =
+    dashboardHost?.isEditing && builder?.selectedId
+      ? builder.graph.componentsById.get(builder.selectedId)
+      : undefined;
+  const selectedBlock = selectedNode
+    ? {
+        id: selectedNode.id,
+        label:
+          selectedNode.id === builder?.graph.rootId
+            ? "ページ全体"
+            : getComponentDisplayParts(selectedNode, dataModel).primary,
+      }
+    : undefined;
+  const activeVersionName =
+    dashboardHost?.isEditing || builder?.isDirty
+      ? "編集中の下書き"
+      : (activeVersion?.name ?? (dashboardHost ? "現在のダッシュボード" : undefined));
+  const dashboardEditBase = builder
+    ? { versionId: activeVersion?.id, messages: builder.messages }
     : undefined;
 
   const chat = useCodexChat({
     currentPagePath,
     activeVersionName,
-    currentMessagesJson,
+    dashboardEditBase,
+    selectedBlock,
     onDataMutated: handleDataMutated,
-    onPreviewA2UI: handlePreviewA2UI,
+    onDashboardProposed: handleDashboardProposed,
   });
 
   useEffect(() => {
+    if (chat.isStreaming) return;
     const prompt = consumePendingAssistantPrompt();
-    if (prompt && !chat.isStreaming) {
+    if (prompt) {
       void chat.sendPrompt(prompt);
     }
   }, [consumePendingAssistantPrompt, chat]);
@@ -129,11 +144,9 @@ export function AssistantSidebar() {
         <SidebarHeader className="h-12 shrink-0 flex-row items-center justify-between gap-2 border-b p-0 pr-2 pl-4">
           <div className="flex min-w-0 items-center gap-2">
             <span className="truncate text-sm font-semibold">
-              {customizeHost ? "ページカスタマイズ" : "AI アシスタント"}
+              {customizeHost ? "カスタマイズ" : "AI アシスタント"}
             </span>
-            {customizeHost ? (
-              activeVersion && <Badge variant="secondary">v{activeVersion.version}</Badge>
-            ) : (
+            {!customizeHost && (
               <>
                 <span
                   className={cn("size-2 shrink-0 rounded-full", statusDotClass)}
@@ -155,6 +168,21 @@ export function AssistantSidebar() {
               />
             ) : (
               <>
+                {dashboardHost?.isEditing && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="md:hidden"
+                    onClick={() => {
+                      dashboardHost.onChangeCustomizeTab("builder");
+                      openPanel("customize");
+                    }}
+                  >
+                    <Settings2 className="size-4" />
+                    カスタマイズパネル
+                  </Button>
+                )}
                 {chat.messages.length > 0 && (
                   <Button
                     type="button"
@@ -202,19 +230,22 @@ export function AssistantSidebar() {
               chat={chat}
               dataModel={dataModel}
               saving={pending}
-              previewDraft={preview?.draft ?? null}
-              compareMode={preview?.compareMode ?? "preview"}
+              activePreviewDraftId={preview?.activePreviewDraftId ?? null}
+              showDashboardReturn={Boolean(preview?.hasProposal || dashboardHost?.isEditing)}
               appliedDraftIds={preview?.appliedDraftIds ?? {}}
+              editingDraftId={preview?.editingDraftId ?? null}
+              selectedBlock={selectedBlock?.label}
+              onClearSelectedBlock={() => builder?.setSelectedId(null)}
+              focusComposer={visiblePanel === "ai" && Boolean(dashboardHost?.isEditing)}
               onExpenseAction={executeExpenseAction}
               onPreviewA2UI={handlePreviewA2UI}
-              onChangeCompareMode={preview?.onChangeCompareMode}
-              onDiscardPreview={preview?.onDiscard}
-              onApplyA2UI={preview?.onApply}
-              onOpenInEditor={preview?.onOpenInEditor}
+              onViewPreview={closePanel}
             />
           </div>
         </SidebarContent>
-        {customizeHost && <DashboardCustomizePanel host={customizeHost} />}
+        {customizeHost && (
+          <DashboardCustomizePanel host={customizeHost} onAskAssistant={() => openPanel("ai")} />
+        )}
 
         <SidebarResizeHandle />
       </Sidebar>
@@ -243,7 +274,7 @@ export function AssistantSidebar() {
 
         {dashboardHost && (
           <PanelToggle
-            label="ページカスタマイズ"
+            label="カスタマイズ"
             active={visiblePanel === "customize"}
             onClick={() => togglePanel("customize")}
           >

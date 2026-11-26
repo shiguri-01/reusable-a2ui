@@ -1,11 +1,16 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { UiVersion } from "@schema";
 import {
   useAssistantSidebar,
   useSyncAssistantExpenses,
 } from "@/features/ai-chat/context/assistant-context";
 import type { ExpenseItem } from "@/features/expenses/model";
-import { useDashboardController, type CustomizePanelTab } from "../hooks/use-dashboard-controller";
+import {
+  useDashboardController,
+  type BuilderCanvasMode,
+  type CustomizePanelTab,
+} from "../hooks/use-dashboard-controller";
+import { useDashboardShortcuts } from "../hooks/use-dashboard-shortcuts";
 import { BlockPaletteDialog } from "./block-palette-dialog";
 import { DashboardCanvas } from "./dashboard-canvas";
 import { SaveVersionDialog } from "./save-version-dialog";
@@ -23,7 +28,10 @@ export function DashboardView({ expenses, uiVersions, activeVersionId }: Dashboa
     requestAssistantPrompt,
     visiblePanel,
     openPanel,
+    closePanel,
   } = useAssistantSidebar();
+  const [editing, setEditing] = useState(false);
+  const isEditing = editing || visiblePanel === "customize";
 
   const controller = useDashboardController({
     expenses,
@@ -32,6 +40,12 @@ export function DashboardView({ expenses, uiVersions, activeVersionId }: Dashboa
     onSendPromptToAssistant: requestAssistantPrompt,
   });
   const controllerRef = useRef(controller);
+  const isReviewingProposal = Boolean(controller.proposal?.mode);
+  useDashboardShortcuts(controller.builder, isEditing && !isReviewingProposal);
+
+  useEffect(() => {
+    if (visiblePanel === "customize") setEditing(true);
+  }, [visiblePanel]);
 
   // Keep sidebar callbacks tied to the latest committed controller state.
   useLayoutEffect(() => {
@@ -44,6 +58,7 @@ export function DashboardView({ expenses, uiVersions, activeVersionId }: Dashboa
     const pendingDraft = consumePendingPreviewDraft();
     if (pendingDraft) {
       controllerRef.current.handlePreviewAiVersion(pendingDraft);
+      setEditing(true);
     }
   }, [consumePendingPreviewDraft]);
 
@@ -56,17 +71,19 @@ export function DashboardView({ expenses, uiVersions, activeVersionId }: Dashboa
       dataModel: controller.dataModel,
       pending: controller.pending,
       builder: controller.builder,
+      isEditing,
       preview: {
-        draft: controller.previewDraft,
-        compareMode: controller.compareMode,
+        hasProposal: controller.proposal !== null,
+        activePreviewDraftId: controller.proposal?.mode ? controller.proposal.draft.draftId : null,
         appliedDraftIds: controller.appliedDraftIds,
-        onPreview: (draft) => controllerRef.current.handlePreviewAiVersion(draft),
-        onChangeCompareMode: (mode) => controllerRef.current.setCompareMode(mode),
-        onDiscard: () => controllerRef.current.handleDiscardPreview(),
-        onApply: (draft) => controllerRef.current.handleApplyAiVersion(draft),
-        onOpenInEditor: (json, name) => {
-          controllerRef.current.handleOpenAiJsonInEditor(json, name);
-          openPanel("customize");
+        editingDraftId: controller.editingDraftId,
+        onPreview: (draft) => {
+          controllerRef.current.handlePreviewAiVersion(draft);
+          setEditing(true);
+        },
+        onReceive: (draft, base) => {
+          controllerRef.current.receiveAiProposal(draft, base);
+          setEditing(true);
         },
       },
       onActivateVersion: (id) => void controllerRef.current.handleActivateVersion(id),
@@ -78,12 +95,12 @@ export function DashboardView({ expenses, uiVersions, activeVersionId }: Dashboa
     controller.dataModel,
     controller.pending,
     controller.builder,
-    controller.previewDraft,
-    controller.compareMode,
+    controller.proposal,
     controller.appliedDraftIds,
+    controller.editingDraftId,
+    isEditing,
     uiVersions,
     setDashboardHost,
-    openPanel,
   ]);
 
   useEffect(() => {
@@ -96,22 +113,44 @@ export function DashboardView({ expenses, uiVersions, activeVersionId }: Dashboa
     if (tab) {
       controller.setCustomizeTab(tab);
     }
+    setEditing(true);
     openPanel("customize");
+  };
+
+  const handleChangeProposalMode = (mode: BuilderCanvasMode) => {
+    if (mode === "edit") {
+      controller.setProposalMode(null);
+      controller.builder.setCanvasMode("edit");
+    } else {
+      controller.setProposalMode(mode);
+    }
   };
 
   return (
     <>
       <DashboardCanvas
-        activeVersion={controller.activeVersion}
         messages={controller.messages}
         dataModel={controller.dataModel}
         pending={controller.pending}
         feedback={controller.feedback}
-        previewDraft={controller.previewDraft}
-        compareMode={controller.compareMode}
-        isCustomizeOpen={visiblePanel === "customize"}
-        customizeTab={controller.customizeTab}
+        proposal={controller.proposal}
+        isEditing={isEditing}
+        isAssistantOpen={visiblePanel === "ai"}
         builder={controller.builder}
+        onChangeProposalMode={handleChangeProposalMode}
+        onCompareProposal={() => controller.setProposalMode("split")}
+        onAdoptProposal={() => {
+          if (!controller.proposal) return;
+          controller.adoptAiProposal(controller.proposal.draft);
+          controller.builder.setCanvasMode("edit");
+        }}
+        onDiscardProposal={controller.handleDiscardPreview}
+        onAskAssistant={() => openPanel("ai")}
+        onFinishEditing={() => {
+          setEditing(false);
+          controller.setProposalMode(null);
+          if (visiblePanel === "customize") closePanel();
+        }}
         onOpenCustomize={handleOpenCustomize}
         onDataModelChange={controller.handleDataModelChange}
         onAction={(act) => void controller.handleAction(act)}

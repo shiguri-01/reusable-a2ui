@@ -1,6 +1,6 @@
 import { useId, type ReactNode } from "react";
 import { useShortcutHint } from "@ui-sdk/react/shortcuts";
-import { Plus, Redo2, Undo2 } from "lucide-react";
+import { Plus, Redo2, Save, Undo2 } from "lucide-react";
 import { getByPath, type DataModel } from "@/features/a2ui/data-model";
 import type { BoundValue } from "@/features/a2ui/types";
 import { Button } from "@/components/ui/button";
@@ -113,21 +113,30 @@ export function CanvasModeControl({
 export function AddBlockButton({
   onClick,
   className,
+  compact = false,
 }: {
   onClick: () => void;
   className?: string;
+  compact?: boolean;
 }) {
   const hint = useShortcutHint("mod+k");
 
   return (
-    <Button type="button" size="sm" className={cn("justify-between", className)} onClick={onClick}>
-      <span className="flex items-center gap-1.5">
-        <Plus className="size-4" />
-        ブロックを追加
-      </span>
-      <kbd className="bg-primary-foreground/15 text-primary-foreground rounded-xs px-1.5 py-0.5 font-sans text-[10px] font-medium">
-        {hint.text}
-      </kbd>
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      className={cn("justify-start", className)}
+      title={`ブロックを追加（${hint.text}）`}
+      onClick={onClick}
+    >
+      <Plus className="size-4" />
+      <span className={cn(compact && "@max-[26rem]:sr-only")}>ブロックを追加</span>
+      {!compact && (
+        <kbd className="bg-muted text-muted-foreground ml-auto rounded-xs px-1.5 py-0.5 font-sans text-[10px] font-medium">
+          {hint.text}
+        </kbd>
+      )}
     </Button>
   );
 }
@@ -168,6 +177,23 @@ export function UndoRedoButtons({
         <Redo2 className="size-3.5" />
       </Button>
     </>
+  );
+}
+
+export function SaveVersionButton({
+  disabled,
+  onClick,
+  className,
+}: {
+  disabled: boolean;
+  onClick: () => void;
+  className?: string;
+}) {
+  return (
+    <Button type="button" size="sm" className={className} disabled={disabled} onClick={onClick}>
+      <Save className="size-4" />
+      保存
+    </Button>
   );
 }
 

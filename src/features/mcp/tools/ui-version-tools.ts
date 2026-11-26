@@ -103,7 +103,7 @@ const activateUiVersionTool = defineTool({
 const proposeDashboardUiTool = defineTool({
   name: "propose_dashboard_ui",
   description:
-    "ダッシュボードの新しいレイアウト案を検証し、画面上のライブプレビュー（Before/After 比較・適用ドック）に反映します。ユーザーがダッシュボードの変更・改善を求めたときに使ってください。",
+    "ダッシュボードの変更案を検証して下書きとして返します。変更後は画面上部の「プレビュー」「保存」を使えます。「下書きと比較」が表示された場合は「下書きに取り込む」の後に保存できます。ダッシュボードの変更・改善を求められたときに使ってください。",
   annotations: {
     title: "ダッシュボード案を作成",
     readOnlyHint: true,

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { UIMessage } from "ai";
-import { AlertCircle, Check, ChevronDown, ChevronRight, Eye, Loader2 } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, ChevronRight, Eye, Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { extractDashboardDraft } from "@/features/a2ui/draft";
@@ -13,6 +13,7 @@ interface ToolCallRowProps {
   part: DynamicToolPart;
   activePreviewDraftId: string | null;
   appliedDraftIds: Record<string, boolean>;
+  editingDraftId: string | null;
   onPreview: (draft: AiPreviewDraft) => void;
 }
 
@@ -20,6 +21,7 @@ export function ToolCallRow({
   part,
   activePreviewDraftId,
   appliedDraftIds,
+  editingDraftId,
   onPreview,
 }: ToolCallRowProps) {
   const [open, setOpen] = useState(false);
@@ -34,6 +36,8 @@ export function ToolCallRow({
 
   const isApplied = dashboardDraft ? Boolean(appliedDraftIds[dashboardDraft.draftId]) : false;
   const isActivePreview = dashboardDraft ? activePreviewDraftId === dashboardDraft.draftId : false;
+  const isEditing = dashboardDraft ? editingDraftId === dashboardDraft.draftId : false;
+  const StatusIcon = isApplied ? Check : isActivePreview ? Eye : Pencil;
 
   return (
     <div className="space-y-1">
@@ -86,10 +90,10 @@ export function ToolCallRow({
 
       {dashboardDraft && (
         <div className="flex min-h-6 items-center px-1 text-xs">
-          {isApplied || isActivePreview ? (
+          {isApplied || isActivePreview || isEditing ? (
             <span className="text-muted-foreground inline-flex items-center gap-1.5">
-              {isApplied ? <Check className="size-3.5" /> : <Eye className="size-3.5" />}
-              {isApplied ? "適用済み" : "プレビュー中"}
+              <StatusIcon className="size-3.5" />
+              {isApplied ? "保存済み" : isActivePreview ? "プレビュー中" : "編集中"}
             </span>
           ) : (
             <Button
@@ -100,7 +104,7 @@ export function ToolCallRow({
               className="h-auto gap-1.5 p-0 text-xs underline underline-offset-2"
             >
               <Eye className="size-3.5" />
-              プレビューを開く（{dashboardDraft.name}）
+              下書きと比較（{dashboardDraft.name}）
             </Button>
           )}
         </div>

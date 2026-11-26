@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { PRESET_UI_VERSIONS } from "@/features/a2ui/presets";
 import {
   CodexAppServerClient,
   MCP_ELICITATION_APPROVAL_POLICY,
   type McpElicitationRequest,
 } from "./client";
+import { CodexChatTransport } from "./transport";
 
 class MockWebSocket extends EventTarget {
   static OPEN = 1;
@@ -55,7 +57,7 @@ class MockWebSocket extends EventTarget {
   }
 }
 
-describe("CodexAppServerClient MCP elicitation support", () => {
+describe("Codex app-server integration", () => {
   beforeEach(() => {
     MockWebSocket.instances = [];
     vi.stubGlobal("WebSocket", MockWebSocket);
@@ -64,6 +66,62 @@ describe("CodexAppServerClient MCP elicitation support", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
+
+  it.each(["completed", "interrupted"] as const)(
+    "publishes only the latest dashboard proposal after a %s turn",
+    async (status) => {
+      const client = new CodexAppServerClient("ws://127.0.0.1:4500");
+      const onDashboardProposed = vi.fn();
+      const transport = new CodexChatTransport({
+        client,
+        getDeveloperInstructions: () => "test",
+        prepareTurn: (text) => ({ text, onDashboardProposed }),
+      });
+      const stream = await transport.sendMessages({
+        trigger: "submit-message",
+        chatId: "chat_1",
+        messageId: undefined,
+        abortSignal: undefined,
+        messages: [{ id: "user_1", role: "user", parts: [{ type: "text", text: "edit" }] }],
+      });
+      const ws = MockWebSocket.instances[0]!;
+      for (const id of ["draft_1", "draft_2"]) {
+        ws.emitMessage({
+          jsonrpc: "2.0",
+          method: "item/completed",
+          params: {
+            threadId: "thr_1",
+            turnId: "turn_1",
+            item: {
+              type: "mcpToolCall",
+              id,
+              tool: "propose_dashboard_ui",
+              result: {
+                structuredContent: {
+                  draft: { name: id, messages: PRESET_UI_VERSIONS[0]!.messages },
+                },
+              },
+            },
+          },
+        });
+      }
+      expect(onDashboardProposed).not.toHaveBeenCalled();
+      ws.emitMessage({
+        jsonrpc: "2.0",
+        method: "turn/completed",
+        params: { threadId: "thr_1", turn: { id: "turn_1", status } },
+      });
+      await stream.cancel();
+
+      if (status === "completed") {
+        expect(onDashboardProposed).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({ draftId: "draft_2" }),
+        );
+      } else {
+        expect(onDashboardProposed).not.toHaveBeenCalled();
+      }
+    },
+  );
 
   it("uses granular approvalPolicy enabling only mcp_elicitations on thread/start and turn/start", async () => {
     const client = new CodexAppServerClient("ws://127.0.0.1:4500");
