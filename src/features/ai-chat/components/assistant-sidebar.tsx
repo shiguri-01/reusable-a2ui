@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { RotateCcw, Settings2, SlidersHorizontal, Sparkles, X } from "lucide-react";
+import { Bot, RotateCcw, Settings, Settings2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sidebar, SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
@@ -157,7 +157,7 @@ export function AssistantSidebar() {
                   aria-label="接続設定"
                   onClick={() => setSettingsOpen(true)}
                 >
-                  <Settings2 className="size-3.5" />
+                  <Settings className="size-3.5" />
                 </Button>
               </>
             )}
@@ -209,7 +209,7 @@ export function AssistantSidebar() {
           active={visiblePanel === "ai"}
           onClick={() => togglePanel("ai")}
         >
-          <Sparkles className="size-4" />
+          <Bot className="size-4" />
           {!isConnected && (
             <span
               className={cn(
@@ -227,7 +227,7 @@ export function AssistantSidebar() {
             active={visiblePanel === "customize"}
             onClick={() => togglePanel("customize")}
           >
-            <SlidersHorizontal className="size-4" />
+            <Settings2 className="size-4" />
           </PanelToggle>
         )}
       </aside>

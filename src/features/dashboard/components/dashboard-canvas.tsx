@@ -1,4 +1,4 @@
-import { Eye, SlidersHorizontal } from "lucide-react";
+import { Eye, Settings2 } from "lucide-react";
 import type { UiVersion } from "@schema";
 import { A2UISurface } from "@/features/a2ui/components/a2ui-surface";
 import type { DataModel } from "@/features/a2ui/data-model";
@@ -73,7 +73,7 @@ export function DashboardCanvas({
             className="shrink-0 gap-2"
             onClick={onOpenCustomize}
           >
-            <SlidersHorizontal className="size-3.5" />
+            <Settings2 className="size-3.5" />
             <span>カスタマイズ</span>
             {activeVersion && <Badge variant="secondary">v{activeVersion.version}</Badge>}
           </Button>
