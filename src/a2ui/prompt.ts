@@ -1,11 +1,5 @@
 import { EXPENSE_CATEGORIES, getTodayIso } from "@/lib/expenses";
-import { a2uiMessagesSchema, EXPENSE_CATALOG_ID, type A2UIMessage } from "./types";
-
-export interface ExtractedA2UIResult {
-  rawJson: string;
-  messages: A2UIMessage[] | null;
-  error: string | null;
-}
+import { EXPENSE_CATALOG_ID } from "./types";
 
 export function buildA2UIDeveloperInstructions(): string {
   return [
@@ -31,6 +25,7 @@ export function buildA2UIDeveloperInstructions(): string {
     "- 支出の閲覧・分析・登録・更新・削除や通常の質問のときは、```a2ui-json コードブロックを出力しない。",
     `- surfaceId は必ず "expense-dashboard"、catalogId は "${EXPENSE_CATALOG_ID}"、rootId は "root" にする。`,
     "- 配列は最低2要素: 1) createSurface, 2) updateComponents。",
+    '- コードブロックの開始行は ```a2ui-json、終了行は ``` とし、各メッセージに version: "0.9" を含める。',
     "- すべての children に参照される id は components 配列内に必ず存在させる。",
     "- すべてのコンポーネントは必ず一意の id と以下のカタログ内の component 名のみを使う。",
     "- Card の description や見出しの補足など、見ればわかる自明な説明文は書かない。",
@@ -81,53 +76,4 @@ export function buildUserTurnPrompt(options: {
     "ユーザーからの依頼:",
     options.userText,
   ].join("\n");
-}
-
-/**
- * Extracts and validates the last ```a2ui-json or ```json code block from an assistant response.
- */
-export function extractA2UIFromText(text: string): ExtractedA2UIResult | null {
-  const regex = /```(?:a2ui-json|json)\s*([\s\S]*?)```/gi;
-  let lastMatch: string | null = null;
-  let match = regex.exec(text);
-  while (match !== null) {
-    lastMatch = match[1]?.trim() ?? null;
-    match = regex.exec(text);
-  }
-
-  if (!lastMatch) return null;
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(lastMatch);
-  } catch {
-    return {
-      rawJson: lastMatch,
-      messages: null,
-      error: "JSON の構文エラーのため自動適用できません",
-    };
-  }
-
-  const validated = a2uiMessagesSchema.safeParse(parsed);
-  if (!validated.success) {
-    const firstIssue = validated.error.issues[0];
-    return {
-      rawJson: lastMatch,
-      messages: null,
-      error: `A2UI スキーマ検証エラー（${firstIssue?.path.join(".") || "root"}：${firstIssue?.message ?? "不正な形式"}）`,
-    };
-  }
-
-  return {
-    rawJson: JSON.stringify(validated.data, null, 2),
-    messages: validated.data,
-    error: null,
-  };
-}
-
-/**
- * Removes ```a2ui-json / ```json blocks for clean chat display.
- */
-export function stripA2UIJsonBlocks(text: string): string {
-  return text.replace(/```(?:a2ui-json|json)\s*[\s\S]*?```/gi, "").trim();
 }

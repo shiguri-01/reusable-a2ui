@@ -325,10 +325,6 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
       setAppliedMessageIds((prev) => ({ ...prev, [options.messageId]: true }));
       setPreviewDraft(null);
       setCompareMode("preview");
-      setFeedback({
-        type: "success",
-        message: `「${options.name}」を適用しました。`,
-      });
     } finally {
       setPending(false);
     }
@@ -397,7 +393,10 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
                 />
               </div>
 
-              <div className="border-primary/40 ring-primary/15 space-y-2.5 rounded-xl border p-4 ring-2">
+              <div
+                key={previewDraft.messageId}
+                className="border-primary/40 ring-primary/15 space-y-2.5 rounded-xl border p-4 ring-2 motion-safe:animate-dashboard-preview-in"
+              >
                 <div className="flex items-center justify-between border-b pb-2">
                   <span className="text-primary text-xs font-semibold">
                     新しいUI（{previewDraft.name}）
@@ -416,7 +415,10 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
               </div>
             </div>
           ) : previewDraft && compareMode === "preview" ? (
-            <div className="border-primary/35 ring-primary/10 rounded-xl border p-4 ring-2">
+            <div
+              key={previewDraft.messageId}
+              className="border-primary/35 ring-primary/10 rounded-xl border p-4 ring-2 motion-safe:animate-dashboard-preview-in"
+            >
               <A2UISurface
                 messages={previewDraft.messages}
                 dataModel={dataModel}

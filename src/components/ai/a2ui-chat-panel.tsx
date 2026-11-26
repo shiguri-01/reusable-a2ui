@@ -2,11 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { AlertCircle, ArrowDown, ArrowUp, Loader2, Square } from "lucide-react";
 import { useStickToBottom } from "use-stick-to-bottom";
-import {
-  buildA2UIDeveloperInstructions,
-  buildUserTurnPrompt,
-  extractA2UIFromText,
-} from "@/a2ui/prompt";
+import { buildA2UIDeveloperInstructions, buildUserTurnPrompt } from "@/a2ui/prompt";
+import { parseA2UIResponse } from "@/a2ui/response";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,9 +17,9 @@ import { ChatMessageItem } from "./chat-message-item";
 import { CodexConnectionBar } from "./codex-connection-bar";
 import { PreviewCompareDock } from "./preview-compare-dock";
 import {
+  createAiPreviewDraft,
   getMessageText,
   getPrecedingUserText,
-  summarizePromptForVersionName,
   type AiPreviewDraft,
   type CompareMode,
 } from "./types";
@@ -81,7 +78,6 @@ export function A2UIChatPanel({
   const [wsUrlInput, setWsUrlInput] = useState(getInitialWsUrl);
   const [showSettings, setShowSettings] = useState(false);
   const [input, setInput] = useState("");
-  const autoPreviewedIdsRef = useRef(new Set<string>());
 
   const latestContextRef = useRef({ activeVersionName, currentMessagesJson });
   latestContextRef.current = { activeVersionName, currentMessagesJson };
@@ -122,34 +118,26 @@ export function A2UIChatPanel({
 
   const { messages, sendMessage, status, stop, setMessages, error, clearError } = useChat({
     transport,
+    onFinish: ({ message, messages, isAbort, isDisconnect, isError, finishReason }) => {
+      if (isAbort || isDisconnect || isError || finishReason === "interrupted") return;
+      const lastIndex = messages.length - 1;
+      if (message.role !== "assistant" || messages[lastIndex]?.id !== message.id) return;
+
+      const { proposal } = parseA2UIResponse(getMessageText(message));
+      if (proposal?.status !== "ready") return;
+      onPreviewA2UI(
+        createAiPreviewDraft(
+          message.id,
+          getPrecedingUserText(messages, lastIndex),
+          nextVersionNumber,
+          proposal,
+        ),
+      );
+    },
   });
 
   const { scrollRef, contentRef, isAtBottom, scrollToBottom } = useStickToBottom();
   const isStreaming = status === "submitted" || status === "streaming";
-
-  const onPreviewRef = useRef(onPreviewA2UI);
-  onPreviewRef.current = onPreviewA2UI;
-
-  useEffect(() => {
-    if (isStreaming || messages.length === 0) return;
-    const lastIndex = messages.length - 1;
-    const lastMsg = messages[lastIndex];
-    if (!lastMsg || lastMsg.role !== "assistant") return;
-    if (autoPreviewedIdsRef.current.has(lastMsg.id)) return;
-
-    const extracted = extractA2UIFromText(getMessageText(lastMsg));
-    if (!extracted?.messages) return;
-
-    const userPrompt = getPrecedingUserText(messages, lastIndex);
-    autoPreviewedIdsRef.current.add(lastMsg.id);
-    onPreviewRef.current({
-      messageId: lastMsg.id,
-      name: summarizePromptForVersionName(userPrompt, nextVersionNumber),
-      description: userPrompt.slice(0, 200),
-      messagesJson: extracted.rawJson,
-      messages: extracted.messages,
-    });
-  }, [isStreaming, messages, nextVersionNumber]);
 
   const handleConnect = async () => {
     const nextUrl = wsUrlInput.trim() || DEFAULT_CODEX_WS_URL;
@@ -172,7 +160,6 @@ export function A2UIChatPanel({
     }
     client.resetThread();
     setMessages([]);
-    autoPreviewedIdsRef.current.clear();
     clearError();
   };
 
@@ -274,14 +261,18 @@ export function A2UIChatPanel({
       </div>
 
       {previewDraft && (
-        <PreviewCompareDock
-          compareMode={compareMode}
-          saving={saving}
-          onChangeCompareMode={onChangeCompareMode}
-          onApply={() => void onApplyA2UI(previewDraft)}
-          onOpenInEditor={() => onOpenInEditor(previewDraft.messagesJson, previewDraft.name)}
-          onDiscard={onDiscardPreview}
-        />
+        <div className="grid shrink-0 grid-rows-[1fr] motion-safe:animate-preview-controls-in">
+          <div className="min-h-0 overflow-hidden">
+            <PreviewCompareDock
+              compareMode={compareMode}
+              saving={saving}
+              onChangeCompareMode={onChangeCompareMode}
+              onApply={() => void onApplyA2UI(previewDraft)}
+              onOpenInEditor={() => onOpenInEditor(previewDraft.messagesJson, previewDraft.name)}
+              onDiscard={onDiscardPreview}
+            />
+          </div>
+        </div>
       )}
 
       {/* Composer */}

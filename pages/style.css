@@ -4,6 +4,24 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@theme {
+  --animate-dashboard-preview-in: dashboard-preview-in 180ms ease-out;
+  --animate-preview-controls-in: preview-controls-in 180ms ease-out;
+
+  @keyframes dashboard-preview-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes preview-controls-in {
+    from {
+      grid-template-rows: 0fr;
+      opacity: 0;
+    }
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

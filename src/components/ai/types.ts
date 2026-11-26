@@ -11,6 +11,21 @@ export interface AiPreviewDraft {
 
 export type CompareMode = "preview" | "current" | "split";
 
+export function createAiPreviewDraft(
+  messageId: string,
+  prompt: string,
+  nextVersionNumber: number,
+  definition: { rawJson: string; messages: A2UIMessage[] },
+): AiPreviewDraft {
+  return {
+    messageId,
+    name: summarizePromptForVersionName(prompt, nextVersionNumber),
+    description: prompt.slice(0, 200),
+    messagesJson: definition.rawJson,
+    messages: definition.messages,
+  };
+}
+
 export function getMessageText(message: UIMessage): string {
   return message.parts
     .filter((p): p is Extract<typeof p, { type: "text" }> => p.type === "text")
