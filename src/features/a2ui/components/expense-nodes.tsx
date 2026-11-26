@@ -3,7 +3,12 @@ import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { formatYen, type CategoryStat, type ExpenseItem } from "@/features/expenses/model";
+import {
+  ALL_CATEGORY_LABEL,
+  formatYen,
+  type CategoryStat,
+  type ExpenseItem,
+} from "@/features/expenses/model";
 import { cn } from "@/lib/utils";
 import { getByPath } from "../data-model";
 import type { A2UIComponent } from "../types";
@@ -51,11 +56,11 @@ export function renderExpenseNode(node: ExpenseNode, ctx: A2UIRenderContext): Re
     case "ExpenseList": {
       const allItems = (getByPath(mergedModel, node.dataPath) as ExpenseItem[] | undefined) ?? [];
       const activeFilter = node.filterPath
-        ? String(getByPath(mergedModel, node.filterPath) ?? "すべて")
-        : "すべて";
+        ? String(getByPath(mergedModel, node.filterPath) ?? ALL_CATEGORY_LABEL)
+        : ALL_CATEGORY_LABEL;
 
       const filtered =
-        activeFilter && activeFilter !== "すべて"
+        activeFilter && activeFilter !== ALL_CATEGORY_LABEL
           ? allItems.filter((item) => item.category === activeFilter)
           : allItems;
 

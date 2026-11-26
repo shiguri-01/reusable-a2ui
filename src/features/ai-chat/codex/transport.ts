@@ -1,14 +1,7 @@
 import type { ChatRequestOptions, ChatTransport, UIMessage, UIMessageChunk } from "ai";
 import { extractDashboardDraft, type DashboardDraft } from "@/features/a2ui/draft";
+import { MUTATING_MCP_TOOL_NAMES } from "@/features/mcp/tool-metadata";
 import type { CodexAppServerClient } from "./client";
-
-const MUTATING_TOOL_NAMES = new Set([
-  "create_expenses",
-  "update_expense",
-  "delete_expenses",
-  "activate_ui_version",
-  "save_ui_version",
-]);
 
 export interface CodexChatTransportOptions {
   client: CodexAppServerClient;
@@ -31,6 +24,13 @@ interface McpToolCallItem {
     structuredContent?: unknown;
   } | null;
   error?: { message?: string } | null;
+}
+
+interface TurnCompletedPayload {
+  id?: string;
+  status?: string;
+  error?: { message?: string } | null;
+  items?: Array<{ type?: string; id?: string; text?: string }>;
 }
 
 function isMcpToolCallItem(item: unknown): item is McpToolCallItem {
@@ -140,6 +140,23 @@ export class CodexChatTransport implements ChatTransport<UIMessage> {
           }
         };
 
+        const ensureToolInputAvailable = (item: McpToolCallItem) => {
+          const toolCallId = item.id ?? `mcp-${Date.now()}`;
+          const toolName = item.tool ?? "mcp_tool";
+          if (!startedToolCallIds.has(toolCallId)) {
+            startedToolCallIds.add(toolCallId);
+            safeEnqueue({
+              type: "tool-input-available",
+              toolCallId,
+              toolName,
+              input: item.arguments ?? {},
+              dynamic: true,
+              providerExecuted: true,
+            });
+          }
+          return { toolCallId, toolName };
+        };
+
         const closeAllParts = () => {
           for (const id of startedReasoningIds) {
             safeEnqueue({ type: "reasoning-end", id });
@@ -152,11 +169,6 @@ export class CodexChatTransport implements ChatTransport<UIMessage> {
           startedTextIds.clear();
         };
 
-        const cleanup = () => {
-          unsubscribe();
-          abortSignal?.removeEventListener("abort", handleAbort);
-        };
-
         const finish = (errorText?: string) => {
           if (closed) return;
           closeAllParts();
@@ -164,7 +176,8 @@ export class CodexChatTransport implements ChatTransport<UIMessage> {
             safeEnqueue({ type: "error", errorText });
           }
           closed = true;
-          cleanup();
+          unsubscribe();
+          abortSignal?.removeEventListener("abort", handleAbort);
           try {
             controller.close();
           } catch {
@@ -179,15 +192,7 @@ export class CodexChatTransport implements ChatTransport<UIMessage> {
           finish();
         };
 
-        if (abortSignal) {
-          if (abortSignal.aborted) {
-            finish();
-            return;
-          }
-          abortSignal.addEventListener("abort", handleAbort, { once: true });
-        }
-
-        const unsubscribe = this.client.subscribeNotifications((method, params) => {
+        const handleNotification = (method: string, params: Record<string, unknown>) => {
           if (closed) return;
 
           const notifThreadId = typeof params.threadId === "string" ? params.threadId : undefined;
@@ -197,38 +202,13 @@ export class CodexChatTransport implements ChatTransport<UIMessage> {
           if (activeTurnId && notifTurnId && notifTurnId !== activeTurnId) return;
 
           if (method === "item/started" && isMcpToolCallItem(params.item)) {
-            const item = params.item;
-            const toolCallId = item.id ?? `mcp-${Date.now()}`;
-            const toolName = item.tool ?? "mcp_tool";
-            if (!startedToolCallIds.has(toolCallId)) {
-              startedToolCallIds.add(toolCallId);
-              safeEnqueue({
-                type: "tool-input-available",
-                toolCallId,
-                toolName,
-                input: item.arguments ?? {},
-                dynamic: true,
-                providerExecuted: true,
-              });
-            }
+            ensureToolInputAvailable(params.item);
             return;
           }
 
           if (method === "item/completed" && isMcpToolCallItem(params.item)) {
             const item = params.item;
-            const toolCallId = item.id ?? `mcp-${Date.now()}`;
-            const toolName = item.tool ?? "mcp_tool";
-            if (!startedToolCallIds.has(toolCallId)) {
-              startedToolCallIds.add(toolCallId);
-              safeEnqueue({
-                type: "tool-input-available",
-                toolCallId,
-                toolName,
-                input: item.arguments ?? {},
-                dynamic: true,
-                providerExecuted: true,
-              });
-            }
+            const { toolCallId, toolName } = ensureToolInputAvailable(item);
 
             if (item.status === "failed" || item.error) {
               safeEnqueue({
@@ -238,24 +218,25 @@ export class CodexChatTransport implements ChatTransport<UIMessage> {
                 dynamic: true,
                 providerExecuted: true,
               });
-            } else {
-              const output = extractMcpToolOutput(item.result);
-              safeEnqueue({
-                type: "tool-output-available",
-                toolCallId,
-                output,
-                dynamic: true,
-                providerExecuted: true,
-              });
-              if (toolName === "propose_dashboard_ui") {
-                const proposal = extractDashboardDraft(toolCallId, output);
-                if (proposal) {
-                  this.onDashboardProposed?.(proposal);
-                }
+              return;
+            }
+
+            const output = extractMcpToolOutput(item.result);
+            safeEnqueue({
+              type: "tool-output-available",
+              toolCallId,
+              output,
+              dynamic: true,
+              providerExecuted: true,
+            });
+            if (toolName === "propose_dashboard_ui") {
+              const proposal = extractDashboardDraft(toolCallId, output);
+              if (proposal) {
+                this.onDashboardProposed?.(proposal);
               }
-              if (MUTATING_TOOL_NAMES.has(toolName)) {
-                this.onDataMutated?.(toolName);
-              }
+            }
+            if (MUTATING_MCP_TOOL_NAMES.has(toolName)) {
+              this.onDataMutated?.(toolName);
             }
             return;
           }
@@ -285,15 +266,7 @@ export class CodexChatTransport implements ChatTransport<UIMessage> {
           }
 
           if (method === "turn/completed") {
-            const turn = params.turn as
-              | {
-                  id?: string;
-                  status?: string;
-                  error?: { message?: string } | null;
-                  items?: Array<{ type?: string; id?: string; text?: string }>;
-                }
-              | undefined;
-
+            const turn = params.turn as TurnCompletedPayload | undefined;
             if (activeTurnId && turn?.id && turn.id !== activeTurnId) return;
 
             if (startedTextIds.size === 0 && Array.isArray(turn?.items)) {
@@ -307,11 +280,11 @@ export class CodexChatTransport implements ChatTransport<UIMessage> {
               }
             }
 
-            if (turn?.status === "failed") {
-              finish(turn.error?.message || "Codex のターン実行に失敗しました");
-              return;
-            }
-            finish();
+            finish(
+              turn?.status === "failed"
+                ? turn.error?.message || "Codex のターン実行に失敗しました"
+                : undefined,
+            );
             return;
           }
 
@@ -322,7 +295,17 @@ export class CodexChatTransport implements ChatTransport<UIMessage> {
                 : "Codex App Server でエラーが発生しました";
             finish(message);
           }
-        });
+        };
+
+        const unsubscribe = this.client.subscribeNotifications(handleNotification);
+
+        if (abortSignal) {
+          if (abortSignal.aborted) {
+            finish();
+            return;
+          }
+          abortSignal.addEventListener("abort", handleAbort, { once: true });
+        }
 
         try {
           const turnRes = await this.client.startTurn({

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { action } from "@void/react";
-import { formatYen, type ExpenseItem } from "../model";
+import { ALL_CATEGORY_LABEL, formatYen, type ExpenseItem } from "../model";
 import { ExpenseCreateDialog } from "./expense-create-dialog";
 import { ExpenseTable } from "./expense-table";
 
@@ -10,13 +10,13 @@ interface ExpensesViewProps {
 
 export function ExpensesView({ expenses }: ExpensesViewProps) {
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("すべて");
+  const [category, setCategory] = useState(ALL_CATEGORY_LABEL);
   const [pendingId, setPendingId] = useState<number | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return expenses.filter((item) => {
-      const matchCat = category === "すべて" || item.category === category;
+      const matchCat = category === ALL_CATEGORY_LABEL || item.category === category;
       const matchQuery =
         !q ||
         item.title.toLowerCase().includes(q) ||

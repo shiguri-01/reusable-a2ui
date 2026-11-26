@@ -1,16 +1,11 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Link, useRouter } from "@void/react";
 import { Layers, PanelRight, ReceiptText, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
-import {
-  DEFAULT_SIDEBAR_WIDTH,
-  MAX_SIDEBAR_WIDTH,
-  MIN_SIDEBAR_WIDTH,
-  SIDEBAR_WIDTH_STORAGE_KEY,
-} from "@/features/dashboard/constants";
+import { useSidebarWidth } from "@/features/dashboard/hooks/use-sidebar-width";
 import { cn } from "@/lib/utils";
 import "./style.css";
 
@@ -41,16 +36,7 @@ function HeaderSidebarToggle() {
 export default function RootLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const isDashboard = router.path === "/";
-  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
-
-  useEffect(() => {
-    const raw = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
-    if (!raw) return;
-    const parsed = Number(raw);
-    if (Number.isFinite(parsed) && parsed >= MIN_SIDEBAR_WIDTH && parsed <= MAX_SIDEBAR_WIDTH) {
-      setSidebarWidth(parsed);
-    }
-  }, []);
+  const sidebarWidth = useSidebarWidth();
 
   return (
     <SidebarProvider

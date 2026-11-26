@@ -14,16 +14,24 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import {
-  DEFAULT_SIDEBAR_WIDTH,
-  MAX_SIDEBAR_WIDTH,
-  MIN_SIDEBAR_WIDTH,
-  SIDEBAR_WIDTH_STORAGE_KEY,
-} from "../constants";
+import { DEFAULT_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH } from "../constants";
+import type { EditorDraft } from "../hooks/use-dashboard-controller";
+import { saveSidebarWidth } from "../hooks/use-sidebar-width";
 import { JsonEditorPanel } from "./json-editor-panel";
 import { VersionHistoryPanel } from "./version-history-panel";
 
 export type DashboardSidebarTab = "ai" | "history" | "editor";
+
+export interface DashboardPreviewControls {
+  draft: AiPreviewDraft | null;
+  compareMode: CompareMode;
+  appliedDraftIds: Record<string, boolean>;
+  onPreview: (draft: AiPreviewDraft) => void;
+  onChangeCompareMode: (mode: CompareMode) => void;
+  onDiscard: () => void;
+  onApply: (draft: AiPreviewDraft) => Promise<void>;
+  onOpenInEditor: (messagesJson: string, suggestedName?: string) => void;
+}
 
 function MobileSidebarCloseButton() {
   const { setOpenMobile } = useSidebar();
@@ -70,7 +78,7 @@ function SidebarResizeHandle() {
       wrapper.removeAttribute("data-resizing");
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
-      window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(latestWidth));
+      saveSidebarWidth(latestWidth);
       window.removeEventListener("pointermove", handleMove);
       window.removeEventListener("pointerup", handleUp);
     };
@@ -83,7 +91,7 @@ function SidebarResizeHandle() {
     const wrapper = e.currentTarget.closest<HTMLElement>('[data-slot="sidebar-wrapper"]');
     if (!wrapper) return;
     wrapper.style.setProperty("--sidebar-width", `${DEFAULT_SIDEBAR_WIDTH}px`);
-    window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(DEFAULT_SIDEBAR_WIDTH));
+    saveSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
   };
 
   return (
@@ -105,30 +113,18 @@ interface DashboardSidebarProps {
   activeVersion: UiVersion | undefined;
   dataModel: DataModel;
   pending: boolean;
-  previewDraft: AiPreviewDraft | null;
-  compareMode: CompareMode;
-  appliedDraftIds: Record<string, boolean>;
-  versionName: string;
-  versionDesc: string;
-  editorJson: string;
-  editorError: string | null;
+  editorDraft: EditorDraft;
+  preview: DashboardPreviewControls;
   onSelectTab: (tab: DashboardSidebarTab) => void;
   onSwitchToEditor: () => void;
   onActivateVersion: (versionId: number) => void;
-  onVersionNameChange: (value: string) => void;
-  onVersionDescChange: (value: string) => void;
-  onEditorJsonChange: (value: string) => void;
+  onEditorDraftChange: (patch: Partial<EditorDraft>) => void;
   onSaveNewVersion: () => void;
   onDataMutated: () => void;
   onExpenseAction: (
     action: A2UIAction,
     formValues: Record<string, unknown>,
   ) => Promise<{ ok: boolean; message?: string }>;
-  onPreviewA2UI: (draft: AiPreviewDraft) => void;
-  onChangeCompareMode: (mode: CompareMode) => void;
-  onDiscardPreview: () => void;
-  onApplyA2UI: (draft: AiPreviewDraft) => Promise<void>;
-  onOpenInEditor: (messagesJson: string, suggestedName?: string) => void;
 }
 
 export function DashboardSidebar({
@@ -137,27 +133,15 @@ export function DashboardSidebar({
   activeVersion,
   dataModel,
   pending,
-  previewDraft,
-  compareMode,
-  appliedDraftIds,
-  versionName,
-  versionDesc,
-  editorJson,
-  editorError,
+  editorDraft,
+  preview,
   onSelectTab,
   onSwitchToEditor,
   onActivateVersion,
-  onVersionNameChange,
-  onVersionDescChange,
-  onEditorJsonChange,
+  onEditorDraftChange,
   onSaveNewVersion,
   onDataMutated,
   onExpenseAction,
-  onPreviewA2UI,
-  onChangeCompareMode,
-  onDiscardPreview,
-  onApplyA2UI,
-  onOpenInEditor,
 }: DashboardSidebarProps) {
   return (
     <Sidebar side="right" collapsible="offcanvas" className="top-14 h-[calc(100svh-3.5rem)]">
@@ -223,23 +207,25 @@ export function DashboardSidebar({
           <div className="min-h-0 flex-1">
             <A2UIChatPanel
               activeVersionName={
-                previewDraft ? `${previewDraft.name} (プレビュー中)` : (activeVersion?.name ?? "v1")
+                preview.draft
+                  ? `${preview.draft.name} (プレビュー中)`
+                  : (activeVersion?.name ?? "v1")
               }
               currentMessagesJson={
-                previewDraft?.messagesJson ?? activeVersion?.messagesJson ?? "[]"
+                preview.draft?.messagesJson ?? activeVersion?.messagesJson ?? "[]"
               }
               dataModel={dataModel}
               saving={pending}
-              previewDraft={previewDraft}
-              compareMode={compareMode}
-              appliedDraftIds={appliedDraftIds}
+              previewDraft={preview.draft}
+              compareMode={preview.compareMode}
+              appliedDraftIds={preview.appliedDraftIds}
               onDataMutated={onDataMutated}
               onExpenseAction={onExpenseAction}
-              onPreviewA2UI={onPreviewA2UI}
-              onChangeCompareMode={onChangeCompareMode}
-              onDiscardPreview={onDiscardPreview}
-              onApplyA2UI={onApplyA2UI}
-              onOpenInEditor={onOpenInEditor}
+              onPreviewA2UI={preview.onPreview}
+              onChangeCompareMode={preview.onChangeCompareMode}
+              onDiscardPreview={preview.onDiscard}
+              onApplyA2UI={preview.onApply}
+              onOpenInEditor={preview.onOpenInEditor}
             />
           </div>
         ) : (
@@ -254,15 +240,7 @@ export function DashboardSidebar({
                   onSwitchToEditor={onSwitchToEditor}
                 />
               ) : (
-                <JsonEditorPanel
-                  versionName={versionName}
-                  versionDesc={versionDesc}
-                  editorJson={editorJson}
-                  editorError={editorError}
-                  onVersionNameChange={onVersionNameChange}
-                  onVersionDescChange={onVersionDescChange}
-                  onEditorJsonChange={onEditorJsonChange}
-                />
+                <JsonEditorPanel draft={editorDraft} onChange={onEditorDraftChange} />
               )}
             </div>
           </ScrollArea>

@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { EXPENSE_CATEGORIES, formatYen, type ExpenseItem } from "../model";
+import { ALL_CATEGORY_LABEL, EXPENSE_CATEGORIES, formatYen, type ExpenseItem } from "../model";
 
 interface ExpenseTableProps {
   expenses: ExpenseItem[];
@@ -46,7 +46,7 @@ export function ExpenseTable({
             />
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {["すべて", ...EXPENSE_CATEGORIES].map((cat) => (
+            {[ALL_CATEGORY_LABEL, ...EXPENSE_CATEGORIES].map((cat) => (
               <Button
                 key={cat}
                 type="button"

@@ -7,13 +7,14 @@ import type { AiPreviewDraft, CompareMode } from "@/features/ai-chat/types";
 import { Badge } from "@/components/ui/badge";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
+import type { DashboardFeedback } from "../hooks/use-dashboard-controller";
 
 interface DashboardCanvasProps {
   activeVersion: UiVersion | undefined;
   messages: A2UIMessage[];
   dataModel: DataModel;
   pending: boolean;
-  feedback: { type: "error" | "success"; message: string } | null;
+  feedback: DashboardFeedback | null;
   previewDraft: AiPreviewDraft | null;
   compareMode: CompareMode;
   onDataModelChange: (next: DataModel) => void;
@@ -31,6 +32,16 @@ export function DashboardCanvas({
   onDataModelChange,
   onAction,
 }: DashboardCanvasProps) {
+  const renderSurface = (surfaceMessages: A2UIMessage[]) => (
+    <A2UISurface
+      messages={surfaceMessages}
+      dataModel={dataModel}
+      onDataModelChange={onDataModelChange}
+      onAction={onAction}
+      pending={pending}
+    />
+  );
+
   return (
     <SidebarInset className="min-w-0 bg-transparent">
       <div
@@ -75,13 +86,7 @@ export function DashboardCanvas({
                   Before
                 </Badge>
               </div>
-              <A2UISurface
-                messages={messages}
-                dataModel={dataModel}
-                onDataModelChange={onDataModelChange}
-                onAction={onAction}
-                pending={pending}
-              />
+              {renderSurface(messages)}
             </div>
 
             <div
@@ -96,13 +101,7 @@ export function DashboardCanvas({
                   After
                 </Badge>
               </div>
-              <A2UISurface
-                messages={previewDraft.messages}
-                dataModel={dataModel}
-                onDataModelChange={onDataModelChange}
-                onAction={onAction}
-                pending={pending}
-              />
+              {renderSurface(previewDraft.messages)}
             </div>
           </div>
         ) : previewDraft && compareMode === "preview" ? (
@@ -110,22 +109,10 @@ export function DashboardCanvas({
             key={previewDraft.draftId}
             className="border-primary/35 ring-primary/10 rounded-xl border p-4 ring-2 motion-safe:animate-dashboard-preview-in"
           >
-            <A2UISurface
-              messages={previewDraft.messages}
-              dataModel={dataModel}
-              onDataModelChange={onDataModelChange}
-              onAction={onAction}
-              pending={pending}
-            />
+            {renderSurface(previewDraft.messages)}
           </div>
         ) : (
-          <A2UISurface
-            messages={messages}
-            dataModel={dataModel}
-            onDataModelChange={onDataModelChange}
-            onAction={onAction}
-            pending={pending}
-          />
+          renderSurface(messages)
         )}
       </div>
     </SidebarInset>

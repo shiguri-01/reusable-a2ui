@@ -1,26 +1,14 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import type { EditorDraft } from "../hooks/use-dashboard-controller";
 
 interface JsonEditorPanelProps {
-  versionName: string;
-  versionDesc: string;
-  editorJson: string;
-  editorError: string | null;
-  onVersionNameChange: (value: string) => void;
-  onVersionDescChange: (value: string) => void;
-  onEditorJsonChange: (value: string) => void;
+  draft: EditorDraft;
+  onChange: (patch: Partial<EditorDraft>) => void;
 }
 
-export function JsonEditorPanel({
-  versionName,
-  versionDesc,
-  editorJson,
-  editorError,
-  onVersionNameChange,
-  onVersionDescChange,
-  onEditorJsonChange,
-}: JsonEditorPanelProps) {
+export function JsonEditorPanel({ draft, onChange }: JsonEditorPanelProps) {
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
@@ -29,8 +17,8 @@ export function JsonEditorPanel({
         </Label>
         <Input
           id="version-name"
-          value={versionName}
-          onChange={(e) => onVersionNameChange(e.target.value)}
+          value={draft.name}
+          onChange={(e) => onChange({ name: e.target.value })}
           placeholder="例：v4：2カラム改善版"
         />
       </div>
@@ -41,8 +29,8 @@ export function JsonEditorPanel({
         </Label>
         <Input
           id="version-desc"
-          value={versionDesc}
-          onChange={(e) => onVersionDescChange(e.target.value)}
+          value={draft.description}
+          onChange={(e) => onChange({ description: e.target.value })}
           placeholder="どこを改善したか"
         />
       </div>
@@ -53,14 +41,14 @@ export function JsonEditorPanel({
         </Label>
         <Textarea
           id="a2ui-json"
-          value={editorJson}
-          onChange={(e) => onEditorJsonChange(e.target.value)}
+          value={draft.json}
+          onChange={(e) => onChange({ json: e.target.value })}
           rows={18}
           className="font-mono text-xs leading-relaxed"
         />
       </div>
 
-      {editorError && <p className="text-destructive text-xs font-medium">{editorError}</p>}
+      {draft.error && <p className="text-destructive text-xs font-medium">{draft.error}</p>}
     </div>
   );
 }

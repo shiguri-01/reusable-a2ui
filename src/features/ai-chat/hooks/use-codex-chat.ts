@@ -1,21 +1,23 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useChat } from "@ai-sdk/react";
 import { buildA2UIDeveloperInstructions, buildUserTurnPrompt } from "@/features/a2ui/prompt";
 import {
   CodexAppServerClient,
   DEFAULT_CODEX_WS_URL,
-  type CodexClientStatus,
   type McpElicitationRequest,
 } from "../codex/client";
 import { CodexChatTransport } from "../codex/transport";
 import type { AiPreviewDraft } from "../types";
 
 const STORAGE_KEY_WS_URL = "reusable-a2ui:codex-ws-url:v3";
-
-function getInitialWsUrl(): string {
-  if (typeof window === "undefined") return DEFAULT_CODEX_WS_URL;
-  return window.localStorage.getItem(STORAGE_KEY_WS_URL) || DEFAULT_CODEX_WS_URL;
-}
 
 interface UseCodexChatOptions {
   activeVersionName: string;
@@ -30,48 +32,74 @@ export function useCodexChat({
   onDataMutated,
   onPreviewA2UI,
 }: UseCodexChatOptions) {
-  const [wsUrlInput, setWsUrlInput] = useState(getInitialWsUrl);
+  const [wsUrlInput, setWsUrlInput] = useState(DEFAULT_CODEX_WS_URL);
   const [pendingElicitations, setPendingElicitations] = useState<McpElicitationRequest[]>([]);
   const [autoApproveSession, setAutoApproveSession] = useState(false);
 
-  const autoApproveSessionRef = useRef(autoApproveSession);
-  autoApproveSessionRef.current = autoApproveSession;
-
-  const latestContextRef = useRef({ activeVersionName, currentMessagesJson });
-  latestContextRef.current = { activeVersionName, currentMessagesJson };
-
-  const onDataMutatedRef = useRef(onDataMutated);
-  onDataMutatedRef.current = onDataMutated;
-
-  const onPreviewRef = useRef(onPreviewA2UI);
-  onPreviewRef.current = onPreviewA2UI;
-
-  const client = useMemo(() => new CodexAppServerClient(getInitialWsUrl()), []);
-  const [codexStatus, setCodexStatus] = useState<CodexClientStatus>(() => client.getStatus());
+  const transportCallbacksRef = useRef({
+    activeVersionName,
+    currentMessagesJson,
+    onDataMutated,
+    onPreviewA2UI,
+  });
 
   useEffect(() => {
+    transportCallbacksRef.current = {
+      activeVersionName,
+      currentMessagesJson,
+      onDataMutated,
+      onPreviewA2UI,
+    };
+  }, [activeVersionName, currentMessagesJson, onDataMutated, onPreviewA2UI]);
+
+  const client = useMemo(() => new CodexAppServerClient(DEFAULT_CODEX_WS_URL), []);
+
+  const subscribeStatus = useCallback(
+    (onStoreChange: () => void) => {
+      let initialized = false;
+      return client.subscribeStatus(() => {
+        if (!initialized) {
+          initialized = true;
+          return;
+        }
+        onStoreChange();
+      });
+    },
+    [client],
+  );
+  const getStatusSnapshot = useCallback(() => client.getStatus(), [client]);
+  const codexStatus = useSyncExternalStore(subscribeStatus, getStatusSnapshot, getStatusSnapshot);
+
+  const handleElicitation = useEffectEvent((request: McpElicitationRequest) => {
+    if (
+      autoApproveSession &&
+      (request.approvalKind === "mcp_tool_call" || request.serverName === "kakeibo")
+    ) {
+      client.respondToMcpElicitation(request.requestId, {
+        action: "accept",
+        persist: request.persistOptions.includes("session") ? "session" : undefined,
+      });
+      return;
+    }
+    setPendingElicitations((prev) => {
+      if (prev.some((item) => item.requestId === request.requestId)) return prev;
+      return [...prev, request];
+    });
+  });
+
+  useEffect(() => {
+    const storedUrl = window.localStorage.getItem(STORAGE_KEY_WS_URL)?.trim();
+    if (storedUrl) {
+      setWsUrlInput(storedUrl);
+      client.setUrl(storedUrl);
+    }
+
     const unsubscribeStatus = client.subscribeStatus((nextStatus) => {
-      setCodexStatus(nextStatus);
       if (nextStatus.state === "disconnected" || nextStatus.state === "error") {
         setPendingElicitations([]);
       }
     });
-    const unsubscribeElicitations = client.subscribeMcpElicitations((request) => {
-      if (
-        autoApproveSessionRef.current &&
-        (request.approvalKind === "mcp_tool_call" || request.serverName === "kakeibo")
-      ) {
-        client.respondToMcpElicitation(request.requestId, {
-          action: "accept",
-          persist: request.persistOptions.includes("session") ? "session" : undefined,
-        });
-        return;
-      }
-      setPendingElicitations((prev) => {
-        if (prev.some((item) => item.requestId === request.requestId)) return prev;
-        return [...prev, request];
-      });
-    });
+    const unsubscribeElicitations = client.subscribeMcpElicitations(handleElicitation);
     const unsubscribeNotifications = client.subscribeNotifications((method, params) => {
       if (method === "serverRequest/resolved") {
         const resolvedId = params.requestId;
@@ -99,11 +127,11 @@ export function useCodexChat({
         formatUserPrompt: (userText) =>
           buildUserTurnPrompt({
             userText,
-            activeVersionName: latestContextRef.current.activeVersionName,
-            currentMessagesJson: latestContextRef.current.currentMessagesJson,
+            activeVersionName: transportCallbacksRef.current.activeVersionName,
+            currentMessagesJson: transportCallbacksRef.current.currentMessagesJson,
           }),
-        onDataMutated: (toolName) => onDataMutatedRef.current(toolName),
-        onDashboardProposed: (proposal) => onPreviewRef.current(proposal),
+        onDataMutated: (toolName) => transportCallbacksRef.current.onDataMutated(toolName),
+        onDashboardProposed: (proposal) => transportCallbacksRef.current.onPreviewA2UI(proposal),
         effort: "low",
       }),
     [client],

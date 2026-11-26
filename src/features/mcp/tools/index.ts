@@ -3,13 +3,10 @@ import type { McpToolDefinition } from "../types";
 import { EXPENSE_MCP_TOOLS } from "./expense-tools";
 import { UI_VERSION_MCP_TOOLS } from "./ui-version-tools";
 
+export { MUTATING_MCP_TOOL_NAMES } from "../tool-metadata";
 export type { McpToolAnnotations, McpToolDefinition } from "../types";
 
 export const MCP_TOOLS: McpToolDefinition[] = [...EXPENSE_MCP_TOOLS, ...UI_VERSION_MCP_TOOLS];
-
-export const MUTATING_MCP_TOOL_NAMES = new Set(
-  MCP_TOOLS.filter((tool) => !tool.annotations.readOnlyHint).map((tool) => tool.name),
-);
 
 export function getMcpToolDescriptors() {
   return MCP_TOOLS.map((tool) => {

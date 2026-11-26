@@ -11,6 +11,18 @@ type LayoutNode = Extract<
   { component: "Column" | "Row" | "Grid" | "Card" | "Divider" }
 >;
 
+const ROW_ALIGN_CLASS = {
+  start: "items-start",
+  center: "items-center",
+  end: "items-end",
+} as const;
+
+const ROW_JUSTIFY_CLASS = {
+  start: "justify-start",
+  between: "justify-between",
+  end: "justify-end",
+} as const;
+
 export function renderLayoutNode(
   node: LayoutNode,
   depth: number,
@@ -28,28 +40,15 @@ export function renderLayoutNode(
     }
 
     case "Row": {
-      const alignClass =
-        node.align === "center"
-          ? "items-center"
-          : node.align === "end"
-            ? "items-end"
-            : "items-start";
-      const justifyClass =
-        node.justify === "between"
-          ? "justify-between"
-          : node.justify === "end"
-            ? "justify-end"
-            : "justify-start";
-
       return (
         <div
           key={node.id}
           className={cn(
             "flex",
             gapMap[node.gap ?? "md"],
-            alignClass,
-            justifyClass,
-            node.wrap ? "flex-wrap" : compact ? "flex-wrap" : "flex-col sm:flex-row",
+            ROW_ALIGN_CLASS[node.align ?? "start"],
+            ROW_JUSTIFY_CLASS[node.justify ?? "start"],
+            node.wrap || compact ? "flex-wrap" : "flex-col sm:flex-row",
           )}
         >
           {node.children.map((childId) => renderNode(childId, depth + 1))}

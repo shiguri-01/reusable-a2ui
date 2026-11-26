@@ -2,19 +2,8 @@ import { useState } from "react";
 import type { UIMessage } from "ai";
 import { AlertCircle, Check, ChevronDown, ChevronRight, Eye, Loader2 } from "lucide-react";
 import { extractDashboardDraft } from "@/features/a2ui/draft";
+import { MCP_TOOL_LABELS } from "@/features/mcp/tool-metadata";
 import type { AiPreviewDraft } from "../types";
-
-const TOOL_LABELS: Record<string, string> = {
-  list_expenses: "支出を検索",
-  get_spending_summary: "支出を集計・分析",
-  create_expenses: "支出を登録",
-  update_expense: "支出を更新",
-  delete_expenses: "支出を削除",
-  list_ui_versions: "UI履歴を取得",
-  activate_ui_version: "UIバージョンを切替",
-  propose_dashboard_ui: "ダッシュボード案を作成",
-  save_ui_version: "UIバージョンを保存",
-};
 
 export type DynamicToolPart = Extract<UIMessage["parts"][number], { type: "dynamic-tool" }>;
 
@@ -32,7 +21,7 @@ export function ToolCallRow({
   onPreview,
 }: ToolCallRowProps) {
   const [open, setOpen] = useState(false);
-  const label = TOOL_LABELS[part.toolName] ?? part.toolName;
+  const label = MCP_TOOL_LABELS[part.toolName] ?? part.toolName;
   const isRunning = part.state === "input-streaming" || part.state === "input-available";
   const isError = part.state === "output-error" || part.state === "output-denied";
 

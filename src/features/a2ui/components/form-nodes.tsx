@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ALL_CATEGORY_LABEL } from "@/features/expenses/model";
 import { cn } from "@/lib/utils";
 import { getByPath } from "../data-model";
 import type { A2UIComponent } from "../types";
@@ -26,8 +27,8 @@ export function renderFormNode(node: FormNode, ctx: A2UIRenderContext): ReactNod
 
   switch (node.component) {
     case "FilterChips": {
-      const current = String(getByPath(mergedModel, node.bindPath) ?? "すべて");
-      const allLabel = node.allLabel ?? "すべて";
+      const allLabel = node.allLabel ?? ALL_CATEGORY_LABEL;
+      const current = String(getByPath(mergedModel, node.bindPath) ?? allLabel);
       const options = [allLabel, ...node.options];
 
       return (

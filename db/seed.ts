@@ -1,5 +1,6 @@
 import { defineSeed } from "void/seed";
 import { PRESET_UI_VERSIONS } from "../src/features/a2ui/presets";
+import { DASHBOARD_SURFACE_ID } from "../src/features/a2ui/types";
 
 const SAMPLE_EXPENSES = [
   {
@@ -65,7 +66,7 @@ export default defineSeed<typeof import("./schema")>(async ({ db, schema }) => {
 
   await db.insert(schema.uiVersions).values(
     PRESET_UI_VERSIONS.map((preset) => ({
-      surfaceId: "expense-dashboard",
+      surfaceId: DASHBOARD_SURFACE_ID,
       version: preset.version,
       name: preset.name,
       description: preset.description,

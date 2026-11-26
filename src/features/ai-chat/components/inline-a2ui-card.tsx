@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { buildSurfaceState, getByPath, type DataModel } from "@/features/a2ui/data-model";
 import { A2UISurface } from "@/features/a2ui/components/a2ui-surface";
 import type { A2UIAction, A2UIMessage } from "@/features/a2ui/types";
-import { EXPENSE_CATEGORIES, getTodayIso } from "@/features/expenses/model";
+import { ALL_CATEGORY_LABEL, createInitialExpenseForm } from "@/features/expenses/model";
 
 interface InlineA2UICardProps {
   messages: A2UIMessage[];
@@ -34,18 +34,13 @@ export function InlineA2UICard({
     const initialFilter = getByPath(initialSurfaceModel, "/filter");
     return {
       ...initialSurfaceModel,
-      form: {
-        title: "",
-        amount: "",
-        category: EXPENSE_CATEGORIES[0],
-        spentAt: getTodayIso(),
-        note: "",
-        ...(initialForm && typeof initialForm === "object"
+      form: createInitialExpenseForm(
+        initialForm && typeof initialForm === "object"
           ? (initialForm as Record<string, unknown>)
-          : {}),
-      },
+          : undefined,
+      ),
       filter: {
-        category: "すべて",
+        category: ALL_CATEGORY_LABEL,
         ...(initialFilter && typeof initialFilter === "object"
           ? (initialFilter as Record<string, unknown>)
           : {}),

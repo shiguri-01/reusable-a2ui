@@ -4,39 +4,53 @@ import { PRESET_UI_VERSIONS } from "@/features/a2ui/presets";
 import { DASHBOARD_SURFACE_ID, type A2UIMessage } from "@/features/a2ui/types";
 import { validateA2UISurfaceMessages } from "@/features/a2ui/validate";
 
-export async function ensureDefaultUiVersions(): Promise<UiVersion[]> {
-  const existing = await db
+export const DEFAULT_ACTIVE_UI_VERSION = 3;
+
+async function listDashboardVersions(): Promise<UiVersion[]> {
+  return await db
     .select()
     .from(uiVersions)
     .where(eq(uiVersions.surfaceId, DASHBOARD_SURFACE_ID))
     .orderBy(asc(uiVersions.version));
+}
+
+async function activateUiVersion(
+  predicate: (row: UiVersion) => boolean,
+): Promise<UiVersion | null> {
+  const rows = await ensureDefaultUiVersions();
+  const target = rows.find(predicate);
+  if (!target) return null;
+
+  await db
+    .update(uiVersions)
+    .set({ isActive: 0 })
+    .where(eq(uiVersions.surfaceId, DASHBOARD_SURFACE_ID));
+  await db.update(uiVersions).set({ isActive: 1 }).where(eq(uiVersions.id, target.id));
+
+  return { ...target, isActive: 1 };
+}
+
+export async function ensureDefaultUiVersions(): Promise<UiVersion[]> {
+  const existing = await listDashboardVersions();
 
   if (existing.length > 0) {
     let updated = false;
     for (const row of existing) {
       const preset = PRESET_UI_VERSIONS.find((p) => p.version === row.version);
       if (!preset) continue;
-      const nextJson = JSON.stringify(preset.messages, null, 2);
       if (row.name.includes(": ") || row.messagesJson.includes("例: ")) {
         await db
           .update(uiVersions)
           .set({
             name: preset.name,
             description: preset.description,
-            messagesJson: nextJson,
+            messagesJson: JSON.stringify(preset.messages, null, 2),
           })
           .where(eq(uiVersions.id, row.id));
         updated = true;
       }
     }
-    if (!updated) {
-      return existing;
-    }
-    return await db
-      .select()
-      .from(uiVersions)
-      .where(eq(uiVersions.surfaceId, DASHBOARD_SURFACE_ID))
-      .orderBy(asc(uiVersions.version));
+    return updated ? await listDashboardVersions() : existing;
   }
 
   await db.insert(uiVersions).values(
@@ -46,43 +60,19 @@ export async function ensureDefaultUiVersions(): Promise<UiVersion[]> {
       name: preset.name,
       description: preset.description,
       messagesJson: JSON.stringify(preset.messages, null, 2),
-      isActive: preset.version === 3 ? 1 : 0,
+      isActive: preset.version === DEFAULT_ACTIVE_UI_VERSION ? 1 : 0,
     })),
   );
 
-  return await db
-    .select()
-    .from(uiVersions)
-    .where(eq(uiVersions.surfaceId, DASHBOARD_SURFACE_ID))
-    .orderBy(asc(uiVersions.version));
+  return await listDashboardVersions();
 }
 
 export async function activateUiVersionById(id: number): Promise<UiVersion | null> {
-  const rows = await ensureDefaultUiVersions();
-  const target = rows.find((row) => row.id === id);
-  if (!target) return null;
-
-  await db
-    .update(uiVersions)
-    .set({ isActive: 0 })
-    .where(eq(uiVersions.surfaceId, DASHBOARD_SURFACE_ID));
-  await db.update(uiVersions).set({ isActive: 1 }).where(eq(uiVersions.id, target.id));
-
-  return { ...target, isActive: 1 };
+  return await activateUiVersion((row) => row.id === id);
 }
 
 export async function activateUiVersionByNumber(versionNumber: number): Promise<UiVersion | null> {
-  const rows = await ensureDefaultUiVersions();
-  const target = rows.find((row) => row.version === versionNumber);
-  if (!target) return null;
-
-  await db
-    .update(uiVersions)
-    .set({ isActive: 0 })
-    .where(eq(uiVersions.surfaceId, DASHBOARD_SURFACE_ID));
-  await db.update(uiVersions).set({ isActive: 1 }).where(eq(uiVersions.id, target.id));
-
-  return { ...target, isActive: 1 };
+  return await activateUiVersion((row) => row.version === versionNumber);
 }
 
 export async function createAndActivateUiVersion(input: {

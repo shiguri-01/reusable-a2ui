@@ -9,9 +9,12 @@
     "skipLibCheck": true,
     "types": ["void/env"],
     "jsx": "react-jsx",
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "void/db": ["./.void/db.d.ts"],
+      "@schema": ["./db/schema.ts"],
+      "@schema/*": ["./db/schema/*"],
+      "void/routes": ["./.void/routes.d.ts"]
     }
   },
   "include": ["src", "pages", "routes", "middleware", "crons", "queues", "db"]

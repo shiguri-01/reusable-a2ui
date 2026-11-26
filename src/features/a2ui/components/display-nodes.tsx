@@ -13,6 +13,20 @@ type DisplayNode = Extract<
   { component: "Text" | "Badge" | "MetricCard" | "ProgressBar" | "KeyValueList" | "Alert" }
 >;
 
+const ALERT_STYLES = {
+  info: "bg-muted/70 text-foreground",
+  success: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  warning: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  destructive: "bg-destructive/10 text-destructive",
+} as const;
+
+const ALERT_ICONS = {
+  info: Info,
+  success: CheckCircle2,
+  warning: AlertTriangle,
+  destructive: AlertCircle,
+} as const;
+
 export function renderDisplayNode(node: DisplayNode, ctx: A2UIRenderContext): ReactNode {
   const { mergedModel, compact } = ctx;
 
@@ -172,29 +186,15 @@ export function renderDisplayNode(node: DisplayNode, ctx: A2UIRenderContext): Re
       const title = resolveValue(mergedModel, node.title);
       const text = resolveValue(mergedModel, node.text) ?? "";
       const variant = node.variant ?? "info";
-
-      const variantStyle =
-        variant === "destructive"
-          ? "bg-destructive/10 text-destructive"
-          : variant === "warning"
-            ? "bg-amber-500/10 text-amber-700 dark:text-amber-400"
-            : variant === "success"
-              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-              : "bg-muted/70 text-foreground";
-
-      const Icon =
-        variant === "destructive"
-          ? AlertCircle
-          : variant === "warning"
-            ? AlertTriangle
-            : variant === "success"
-              ? CheckCircle2
-              : Info;
+      const Icon = ALERT_ICONS[variant];
 
       return (
         <div
           key={node.id}
-          className={cn("flex items-start gap-2.5 rounded-lg px-3 py-2.5 text-xs", variantStyle)}
+          className={cn(
+            "flex items-start gap-2.5 rounded-lg px-3 py-2.5 text-xs",
+            ALERT_STYLES[variant],
+          )}
         >
           <Icon className="mt-0.5 size-4 shrink-0" />
           <div className="min-w-0 space-y-0.5">

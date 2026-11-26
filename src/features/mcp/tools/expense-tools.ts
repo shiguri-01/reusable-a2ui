@@ -1,7 +1,12 @@
-import { asc, db, desc, eq, inArray } from "void/db";
+import { and, asc, db, desc, eq, gte, inArray, lte } from "void/db";
 import { expenses, type Expense } from "@schema";
 import { z } from "zod";
-import { EXPENSE_CATEGORIES, getTodayIso, MONTHLY_BUDGET_LIMIT } from "@/features/expenses/model";
+import {
+  EXPENSE_CATEGORIES,
+  getTodayIso,
+  MONTHLY_BUDGET_LIMIT,
+  summarizeExpenses,
+} from "@/features/expenses/model";
 import { defineTool, type McpToolDefinition } from "../types";
 
 const categoryEnum = z.enum(EXPENSE_CATEGORIES);
@@ -32,18 +37,18 @@ function serializeExpense(row: Expense) {
   };
 }
 
-function filterExpensesInMemory(
-  rows: Expense[],
-  filters: {
-    query?: string;
-    category?: string;
-    month?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    minAmount?: number;
-    maxAmount?: number;
-  },
-): { matched: Expense[]; effectiveDateFrom?: string; effectiveDateTo?: string } {
+interface ExpenseQueryFilters {
+  query?: string;
+  category?: string;
+  month?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  minAmount?: number;
+  maxAmount?: number;
+  sortBy?: "spentAt_desc" | "spentAt_asc" | "amount_desc" | "amount_asc";
+}
+
+function resolveDateBounds(filters: Pick<ExpenseQueryFilters, "month" | "dateFrom" | "dateTo">) {
   let effectiveDateFrom = filters.dateFrom;
   let effectiveDateTo = filters.dateTo;
 
@@ -53,20 +58,55 @@ function filterExpensesInMemory(
     if (!effectiveDateTo || range.to < effectiveDateTo) effectiveDateTo = range.to;
   }
 
-  const q = filters.query?.trim().toLowerCase();
+  return { effectiveDateFrom, effectiveDateTo };
+}
 
-  const matched = rows.filter((item) => {
-    if (filters.category && item.category !== filters.category) return false;
-    if (effectiveDateFrom && item.spentAt < effectiveDateFrom) return false;
-    if (effectiveDateTo && item.spentAt > effectiveDateTo) return false;
-    if (filters.minAmount !== undefined && item.amount < filters.minAmount) return false;
-    if (filters.maxAmount !== undefined && item.amount > filters.maxAmount) return false;
-    if (q) {
-      const hay = `${item.title} ${item.note} ${item.category}`.toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    return true;
-  });
+function getOrderColumns(sortBy: ExpenseQueryFilters["sortBy"]) {
+  switch (sortBy) {
+    case "spentAt_asc":
+      return [asc(expenses.spentAt), asc(expenses.id)];
+    case "amount_desc":
+      return [desc(expenses.amount), desc(expenses.spentAt)];
+    case "amount_asc":
+      return [asc(expenses.amount), desc(expenses.spentAt)];
+    default:
+      return [desc(expenses.spentAt), desc(expenses.id)];
+  }
+}
+
+async function queryFilteredExpenses(filters: ExpenseQueryFilters): Promise<{
+  matched: Expense[];
+  effectiveDateFrom?: string;
+  effectiveDateTo?: string;
+}> {
+  const { effectiveDateFrom, effectiveDateTo } = resolveDateBounds(filters);
+  const conditions = [];
+
+  if (filters.category) {
+    conditions.push(eq(expenses.category, filters.category));
+  }
+  if (effectiveDateFrom) {
+    conditions.push(gte(expenses.spentAt, effectiveDateFrom));
+  }
+  if (effectiveDateTo) {
+    conditions.push(lte(expenses.spentAt, effectiveDateTo));
+  }
+  if (filters.minAmount !== undefined) {
+    conditions.push(gte(expenses.amount, filters.minAmount));
+  }
+  if (filters.maxAmount !== undefined) {
+    conditions.push(lte(expenses.amount, filters.maxAmount));
+  }
+
+  const baseQuery = db.select().from(expenses);
+  const rows = await (
+    conditions.length > 0 ? baseQuery.where(and(...conditions)) : baseQuery
+  ).orderBy(...getOrderColumns(filters.sortBy));
+
+  const q = filters.query?.trim().toLowerCase();
+  const matched = q
+    ? rows.filter((item) => `${item.title} ${item.note} ${item.category}`.toLowerCase().includes(q))
+    : rows;
 
   return { matched, effectiveDateFrom, effectiveDateTo };
 }
@@ -105,21 +145,7 @@ const listExpensesTool = defineTool({
       .describe("返却する最大件数（デフォルト: 30、最大: 200）"),
   }),
   execute: async (args) => {
-    const orderCols =
-      args.sortBy === "spentAt_asc"
-        ? [asc(expenses.spentAt), asc(expenses.id)]
-        : args.sortBy === "amount_desc"
-          ? [desc(expenses.amount), desc(expenses.spentAt)]
-          : args.sortBy === "amount_asc"
-            ? [asc(expenses.amount), desc(expenses.spentAt)]
-            : [desc(expenses.spentAt), desc(expenses.id)];
-
-    const allRows = await db
-      .select()
-      .from(expenses)
-      .orderBy(...orderCols);
-
-    const { matched, effectiveDateFrom, effectiveDateTo } = filterExpensesInMemory(allRows, args);
+    const { matched, effectiveDateFrom, effectiveDateTo } = await queryFilteredExpenses(args);
     const filteredTotalAmount = matched.reduce((sum, item) => sum + item.amount, 0);
     const sliced = matched.slice(0, args.limit);
 
@@ -170,33 +196,16 @@ const getSpendingSummaryTool = defineTool({
       .describe(`比較する予算上限（円）。省略時はデフォルトの ${MONTHLY_BUDGET_LIMIT} 円`),
   }),
   execute: async (args) => {
-    const allRows = await db
-      .select()
-      .from(expenses)
-      .orderBy(desc(expenses.spentAt), desc(expenses.id));
-
-    const { matched, effectiveDateFrom, effectiveDateTo } = filterExpensesInMemory(allRows, args);
-
-    const totalAmount = matched.reduce((sum, item) => sum + item.amount, 0);
-    const count = matched.length;
-    const averageAmount = count > 0 ? Math.round(totalAmount / count) : 0;
+    const { matched, effectiveDateFrom, effectiveDateTo } = await queryFilteredExpenses(args);
+    const summary = summarizeExpenses(matched, args.budgetLimit);
 
     let maxExpense: Expense | null = null;
     let minExpense: Expense | null = null;
-    for (const item of matched) {
-      if (!maxExpense || item.amount > maxExpense.amount) maxExpense = item;
-      if (!minExpense || item.amount < minExpense.amount) minExpense = item;
-    }
-
-    const byCategoryMap = new Map<string, { total: number; count: number }>();
     const byMonthMap = new Map<string, { total: number; count: number }>();
 
     for (const item of matched) {
-      const catPrev = byCategoryMap.get(item.category) ?? { total: 0, count: 0 };
-      byCategoryMap.set(item.category, {
-        total: catPrev.total + item.amount,
-        count: catPrev.count + 1,
-      });
+      if (!maxExpense || item.amount > maxExpense.amount) maxExpense = item;
+      if (!minExpense || item.amount < minExpense.amount) minExpense = item;
 
       const ym = item.spentAt.slice(0, 7);
       const monthPrev = byMonthMap.get(ym) ?? { total: 0, count: 0 };
@@ -206,15 +215,6 @@ const getSpendingSummaryTool = defineTool({
       });
     }
 
-    const byCategory = Array.from(byCategoryMap.entries())
-      .map(([category, stat]) => ({
-        category,
-        total: stat.total,
-        count: stat.count,
-        ratioPercent: totalAmount > 0 ? Math.round((stat.total / totalAmount) * 100) : 0,
-      }))
-      .sort((a, b) => b.total - a.total);
-
     const byMonth = Array.from(byMonthMap.entries())
       .map(([month, stat]) => ({
         month,
@@ -222,10 +222,6 @@ const getSpendingSummaryTool = defineTool({
         count: stat.count,
       }))
       .sort((a, b) => b.month.localeCompare(a.month));
-
-    const budgetLimit = args.budgetLimit ?? MONTHLY_BUDGET_LIMIT;
-    const remaining = budgetLimit - totalAmount;
-    const usagePercent = budgetLimit > 0 ? Math.round((totalAmount / budgetLimit) * 100) : 0;
 
     return {
       today: getTodayIso(),
@@ -235,19 +231,18 @@ const getSpendingSummaryTool = defineTool({
         dateFrom: effectiveDateFrom ?? null,
         dateTo: effectiveDateTo ?? null,
       },
-      totalAmount,
-      count,
-      averageAmount,
+      totalAmount: summary.total,
+      count: summary.count,
+      averageAmount: summary.average,
       maxExpense: maxExpense ? serializeExpense(maxExpense) : null,
       minExpense: minExpense ? serializeExpense(minExpense) : null,
-      budget: {
-        limit: budgetLimit,
-        spent: totalAmount,
-        remaining,
-        usagePercent,
-        isOverBudget: remaining < 0,
-      },
-      byCategory,
+      budget: summary.budget,
+      byCategory: summary.categories.map((cat) => ({
+        category: cat.category,
+        total: cat.total,
+        count: cat.count,
+        ratioPercent: cat.ratio,
+      })),
       byMonth,
     };
   },
