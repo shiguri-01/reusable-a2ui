@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "streamdown/styles.css";
+@source "../node_modules/streamdown/dist/*.js";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -129,4 +131,55 @@
   input[type="date"]::-webkit-calendar-picker-indicator:hover {
     opacity: 1;
   }
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  .shadcn-scrollbar,
+  .shadcn-scrollbar * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+}
+
+.shadcn-scrollbar::-webkit-scrollbar,
+.shadcn-scrollbar *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.shadcn-scrollbar::-webkit-scrollbar-track,
+.shadcn-scrollbar *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.shadcn-scrollbar::-webkit-scrollbar-thumb,
+.shadcn-scrollbar *::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.shadcn-scrollbar::-webkit-scrollbar-thumb:hover,
+.shadcn-scrollbar *::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in oklab, var(--muted-foreground) 45%, transparent);
+}
+
+.shadcn-scrollbar::-webkit-scrollbar-corner,
+.shadcn-scrollbar *::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+[data-streamdown="table-wrapper"]:not([data-streamdown="table-fullscreen"] > *),
+[data-streamdown="code-block"],
+[data-streamdown="raw-code-block"],
+[data-streamdown="mermaid-block"] {
+  border: none;
+  background-color: color-mix(in oklab, var(--muted) 60%, transparent);
+}
+
+[data-streamdown="code-block-actions"],
+[data-streamdown="mermaid-block-actions"] {
+  border: none;
+  background-color: color-mix(in oklab, var(--muted) 75%, transparent);
 }

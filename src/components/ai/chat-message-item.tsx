@@ -3,6 +3,7 @@ import type { UIMessage } from "ai";
 import { AlertCircle, Check, ChevronDown, ChevronRight, Eye, Loader2 } from "lucide-react";
 import { extractA2UIFromText, stripA2UIJsonBlocks } from "@/a2ui/prompt";
 import { cn } from "@/lib/utils";
+import { MarkdownContent } from "./markdown-content";
 import {
   getMessageReasoning,
   getMessageText,
@@ -115,7 +116,9 @@ export function ChatMessageItem({
   const displayText = extracted ? stripA2UIJsonBlocks(textContent) : textContent;
 
   return (
-    <div className={cn("flex flex-col gap-2", isUser ? "items-end" : "items-start")}>
+    <div
+      className={cn("shadcn-scrollbar flex flex-col gap-2", isUser ? "items-end" : "items-start")}
+    >
       {!isUser && reasoningContent && (
         <div className="w-full">
           <button
@@ -148,13 +151,15 @@ export function ChatMessageItem({
 
       <div
         className={cn(
-          "text-sm leading-relaxed whitespace-pre-wrap",
+          "text-sm leading-relaxed",
           isUser
-            ? "bg-primary text-primary-foreground max-w-[90%] rounded-lg px-3.5 py-2"
-            : "text-foreground w-full py-0.5",
+            ? "bg-primary text-primary-foreground max-w-[90%] rounded-lg px-3.5 py-2 whitespace-pre-wrap"
+            : "text-foreground min-w-0 w-full py-0.5 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
         )}
       >
-        {!isUser && !displayText && isStreamingThis ? (
+        {isUser ? (
+          displayText
+        ) : !displayText && isStreamingThis ? (
           toolParts.length === 0 ? (
             <span className="text-muted-foreground inline-flex items-center gap-1.5">
               <Loader2 className="size-4 animate-spin" />
@@ -162,7 +167,10 @@ export function ChatMessageItem({
             </span>
           ) : null
         ) : (
-          displayText || (extracted ? "新しい UI を生成しました。" : "")
+          <MarkdownContent
+            content={displayText || (extracted ? "新しい UI を生成しました。" : "")}
+            isAnimating={isStreamingThis}
+          />
         )}
       </div>
 
