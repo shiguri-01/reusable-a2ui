@@ -2,6 +2,13 @@
 import { defineConfig } from "void/config";
 
 export default defineConfig({
+  head: {
+    title: "支出ログ",
+    titleTemplate: "%s | 支出ログ",
+    htmlAttrs: {
+      lang: "ja",
+    },
+  },
   routing: {
     typedRoutes: true,
   },

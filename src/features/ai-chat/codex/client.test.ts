@@ -252,4 +252,18 @@ describe("Codex app-server integration", () => {
       },
     });
   });
+
+  it("notifies status subscribers only on state transitions", async () => {
+    const client = new CodexAppServerClient("ws://127.0.0.1:4500");
+    const states: string[] = [];
+    const unsubscribe = client.subscribeStatus((status) => states.push(status.state));
+
+    expect(states).toEqual([]);
+    await client.connect();
+    expect(states).toEqual(["connecting", "connected"]);
+
+    unsubscribe();
+    client.disconnect();
+    expect(states).toEqual(["connecting", "connected"]);
+  });
 });

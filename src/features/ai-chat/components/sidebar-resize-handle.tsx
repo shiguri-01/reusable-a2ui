@@ -1,45 +1,59 @@
+import { useEffect, useRef } from "react";
+import { bindDrag } from "@ui-sdk/core";
 import {
+  clampSidebarWidth,
   DEFAULT_SIDEBAR_WIDTH,
-  MAX_SIDEBAR_WIDTH,
-  MIN_SIDEBAR_WIDTH,
   saveSidebarWidth,
 } from "../hooks/use-sidebar-width";
 
 export function SidebarResizeHandle() {
+  const cleanupDragRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => () => cleanupDragRef.current?.(), []);
+
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
     e.preventDefault();
     const wrapper = e.currentTarget.closest<HTMLElement>('[data-slot="sidebar-wrapper"]');
     if (!wrapper) return;
 
     const startX = e.clientX;
-    const currentWidth =
+    const initialWidth =
       parseFloat(getComputedStyle(wrapper).getPropertyValue("--sidebar-width")) ||
       DEFAULT_SIDEBAR_WIDTH;
-    let latestWidth = currentWidth;
+    let latestWidth = initialWidth;
+
+    const resetBodyStyles = () => {
+      wrapper.removeAttribute("data-resizing");
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
 
     wrapper.setAttribute("data-resizing", "true");
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
 
-    const handleMove = (ev: PointerEvent) => {
-      const delta = startX - ev.clientX;
-      latestWidth = Math.round(
-        Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, currentWidth + delta)),
-      );
-      wrapper.style.setProperty("--sidebar-width", `${latestWidth}px`);
+    cleanupDragRef.current?.();
+    const stop = bindDrag(e.currentTarget, e.nativeEvent, {
+      cancelOnEscape: true,
+      onMove: ({ x }) => {
+        latestWidth = clampSidebarWidth(initialWidth + (startX - x));
+        wrapper.style.setProperty("--sidebar-width", `${latestWidth}px`);
+      },
+      onEnd: (_event, canceled) => {
+        cleanupDragRef.current = null;
+        resetBodyStyles();
+        if (canceled) {
+          wrapper.style.setProperty("--sidebar-width", `${initialWidth}px`);
+        } else {
+          saveSidebarWidth(latestWidth);
+        }
+      },
+    });
+    cleanupDragRef.current = () => {
+      stop();
+      resetBodyStyles();
     };
-
-    const handleUp = () => {
-      wrapper.removeAttribute("data-resizing");
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      saveSidebarWidth(latestWidth);
-      window.removeEventListener("pointermove", handleMove);
-      window.removeEventListener("pointerup", handleUp);
-    };
-
-    window.addEventListener("pointermove", handleMove);
-    window.addEventListener("pointerup", handleUp);
   };
 
   const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {

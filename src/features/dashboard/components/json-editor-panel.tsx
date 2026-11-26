@@ -1,9 +1,9 @@
-import { useState } from "react";
 import { AlertCircle, Check, Copy, Wand2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 
 interface JsonEditorPanelProps {
   rawJson: string;
@@ -13,17 +13,7 @@ interface JsonEditorPanelProps {
 }
 
 export function JsonEditorPanel({ rawJson, jsonError, onChange, onFormat }: JsonEditorPanelProps) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(rawJson);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Ignore clipboard failures in restricted environments.
-    }
-  };
+  const { copied, copy } = useCopyToClipboard(1500);
 
   return (
     <div className="space-y-2.5">
@@ -49,7 +39,7 @@ export function JsonEditorPanel({ rawJson, jsonError, onChange, onFormat }: Json
             variant="outline"
             size="sm"
             className="h-7 gap-1 px-2.5 text-xs"
-            onClick={() => void handleCopy()}
+            onClick={() => void copy(rawJson)}
           >
             {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
             {copied ? "コピー済" : "コピー"}

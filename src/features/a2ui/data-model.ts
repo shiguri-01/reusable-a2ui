@@ -35,6 +35,14 @@ export function getByPath(model: DataModel, path: string): unknown {
   return current;
 }
 
+export function toPrimitiveString(value: unknown, fallback = ""): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+    return String(value);
+  }
+  return fallback;
+}
+
 export function setByPath(model: DataModel, path: string, value: unknown): DataModel {
   const segments = splitPath(path);
   if (segments.length === 0) {

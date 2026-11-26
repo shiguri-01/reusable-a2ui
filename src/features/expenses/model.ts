@@ -31,14 +31,6 @@ export interface ExpenseSummary {
   };
 }
 
-export interface ExpenseFormValues {
-  title: string;
-  amount: string;
-  category: string;
-  spentAt: string;
-  note: string;
-}
-
 export function formatYen(amount: number): string {
   return `¥${Math.round(amount).toLocaleString("ja-JP")}`;
 }

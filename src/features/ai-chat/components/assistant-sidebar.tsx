@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useState, type ReactNode } from "react";
 import { Bot, RotateCcw, Settings, Settings2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sidebar, SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
@@ -75,7 +75,8 @@ export function AssistantSidebar() {
     handleDataMutated,
     handlePreviewA2UI,
     handleDashboardProposed,
-    consumePendingAssistantPrompt,
+    pendingAssistantPrompt,
+    clearPendingAssistantPrompt,
   } = useAssistantSidebar();
 
   const customizeHost = activePanel === "customize" ? dashboardHost : null;
@@ -112,13 +113,15 @@ export function AssistantSidebar() {
     onDashboardProposed: handleDashboardProposed,
   });
 
+  const sendQueuedPrompt = useEffectEvent((prompt: string) => {
+    clearPendingAssistantPrompt();
+    void chat.sendPrompt(prompt);
+  });
+
   useEffect(() => {
-    if (chat.isStreaming) return;
-    const prompt = consumePendingAssistantPrompt();
-    if (prompt) {
-      void chat.sendPrompt(prompt);
-    }
-  }, [consumePendingAssistantPrompt, chat]);
+    if (!pendingAssistantPrompt || chat.isStreaming) return;
+    sendQueuedPrompt(pendingAssistantPrompt);
+  }, [pendingAssistantPrompt, chat.isStreaming]);
 
   const { codexStatus } = chat;
   const isConnected = codexStatus.state === "connected";

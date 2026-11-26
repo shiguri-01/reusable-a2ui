@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import {
   closestCenter,
   DndContext,
@@ -41,8 +41,6 @@ export function A2UIEditableSurfaceRoot({
   editor,
   children,
 }: A2UIEditableSurfaceRootProps) {
-  const [, setActiveDragId] = useState<string | null>(null);
-
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 6 },
@@ -65,13 +63,10 @@ export function A2UIEditableSurfaceRoot({
   };
 
   const handleDragStart = (event: DragStartEvent) => {
-    const id = String(event.active.id);
-    setActiveDragId(id);
-    editor.onSelect(id);
+    editor.onSelect(String(event.active.id));
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    setActiveDragId(null);
     const { active, over } = event;
     if (!over) return;
 
@@ -88,12 +83,6 @@ export function A2UIEditableSurfaceRoot({
     const overPlacement = findParentAndIndex(overId);
     if (overPlacement) {
       editor.onMove(activeId, overPlacement.parentId, overPlacement.index);
-      return;
-    }
-
-    const overNode = componentsById.get(overId);
-    if (overNode && isContainerComponent(overNode)) {
-      editor.onMove(activeId, overNode.id, overNode.children.length);
     }
   };
 
@@ -104,7 +93,6 @@ export function A2UIEditableSurfaceRoot({
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      onDragCancel={() => setActiveDragId(null)}
     >
       <div
         className="space-y-4"

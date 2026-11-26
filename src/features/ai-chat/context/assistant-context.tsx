@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -64,7 +65,8 @@ interface AssistantSidebarContextValue {
   handleDataMutated: () => void;
   handlePreviewA2UI: (draft: AiPreviewDraft) => void;
   handleDashboardProposed: (draft: AiPreviewDraft, base?: DashboardEditBase) => void;
-  consumePendingAssistantPrompt: () => string | null;
+  pendingAssistantPrompt: string | null;
+  clearPendingAssistantPrompt: () => void;
 }
 
 interface AssistantPageContextValue {
@@ -73,7 +75,6 @@ interface AssistantPageContextValue {
   visiblePanel: SidebarPanel | null;
   openPanel: (panel: SidebarPanel) => void;
   closePanel: () => void;
-  consumePendingPreviewDraft: () => AiPreviewDraft | null;
   requestAssistantPrompt: (text: string) => void;
 }
 
@@ -83,21 +84,28 @@ const AssistantPageContext = createContext<AssistantPageContextValue | null>(nul
 export function AssistantSidebarProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { open, openMobile, isMobile, setOpen, setOpenMobile } = useSidebar();
-  const [dashboardHost, setDashboardHost] = useState<DashboardSidebarHost | null>(null);
+  const [dashboardHost, setDashboardHostState] = useState<DashboardSidebarHost | null>(null);
   const [selectedPanel, setSelectedPanel] = useState<SidebarPanel>("ai");
   const [pageExpenses, setPageExpenses] = useState<ExpenseItem[]>([]);
   const [pendingAction, setPendingAction] = useState(false);
-  const [pendingPreviewDraft, setPendingPreviewDraft] = useState<AiPreviewDraft | null>(null);
+  const pendingPreviewDraftRef = useRef<AiPreviewDraft | null>(null);
   const [pendingAssistantPrompt, setPendingAssistantPrompt] = useState<string | null>(null);
 
   const activePanel = dashboardHost ? selectedPanel : "ai";
   const visiblePanel = (isMobile ? openMobile : open) ? activePanel : null;
 
-  useEffect(() => {
-    if (!dashboardHost && selectedPanel === "customize") {
+  const setDashboardHost = useCallback((host: DashboardSidebarHost | null) => {
+    setDashboardHostState(host);
+    if (!host) {
       setSelectedPanel("ai");
+      return;
     }
-  }, [dashboardHost, selectedPanel]);
+    const pendingDraft = pendingPreviewDraftRef.current;
+    if (pendingDraft) {
+      pendingPreviewDraftRef.current = null;
+      host.preview.onPreview(pendingDraft);
+    }
+  }, []);
 
   const setSidebarOpen = useCallback(
     (next: boolean) => {
@@ -161,7 +169,7 @@ export function AssistantSidebarProvider({ children }: { children: ReactNode }) 
         dashboardHost.preview.onPreview(draft);
         return;
       }
-      setPendingPreviewDraft(draft);
+      pendingPreviewDraftRef.current = draft;
       void router.visit("/");
     },
     [dashboardHost, router],
@@ -178,13 +186,6 @@ export function AssistantSidebarProvider({ children }: { children: ReactNode }) 
     [dashboardHost, handlePreviewA2UI],
   );
 
-  const consumePendingPreviewDraft = useCallback(() => {
-    if (!pendingPreviewDraft) return null;
-    const draft = pendingPreviewDraft;
-    setPendingPreviewDraft(null);
-    return draft;
-  }, [pendingPreviewDraft]);
-
   const requestAssistantPrompt = useCallback(
     (text: string) => {
       const trimmed = text.trim();
@@ -195,12 +196,9 @@ export function AssistantSidebarProvider({ children }: { children: ReactNode }) 
     [openPanel],
   );
 
-  const consumePendingAssistantPrompt = useCallback(() => {
-    if (!pendingAssistantPrompt) return null;
-    const prompt = pendingAssistantPrompt;
+  const clearPendingAssistantPrompt = useCallback(() => {
     setPendingAssistantPrompt(null);
-    return prompt;
-  }, [pendingAssistantPrompt]);
+  }, []);
 
   // Pages publish data to the sidebar without subscribing to the data they publish.
   const pageValue = useMemo<AssistantPageContextValue>(
@@ -210,10 +208,9 @@ export function AssistantSidebarProvider({ children }: { children: ReactNode }) 
       visiblePanel,
       openPanel,
       closePanel,
-      consumePendingPreviewDraft,
       requestAssistantPrompt,
     }),
-    [visiblePanel, openPanel, closePanel, consumePendingPreviewDraft, requestAssistantPrompt],
+    [setDashboardHost, visiblePanel, openPanel, closePanel, requestAssistantPrompt],
   );
 
   const value = useMemo<AssistantSidebarContextValue>(
@@ -231,7 +228,8 @@ export function AssistantSidebarProvider({ children }: { children: ReactNode }) 
       handleDataMutated,
       handlePreviewA2UI,
       handleDashboardProposed,
-      consumePendingAssistantPrompt,
+      pendingAssistantPrompt,
+      clearPendingAssistantPrompt,
     }),
     [
       router.path,
@@ -247,14 +245,15 @@ export function AssistantSidebarProvider({ children }: { children: ReactNode }) 
       handleDataMutated,
       handlePreviewA2UI,
       handleDashboardProposed,
-      consumePendingAssistantPrompt,
+      pendingAssistantPrompt,
+      clearPendingAssistantPrompt,
     ],
   );
 
   return (
-    <AssistantPageContext.Provider value={pageValue}>
-      <AssistantSidebarContext.Provider value={value}>{children}</AssistantSidebarContext.Provider>
-    </AssistantPageContext.Provider>
+    <AssistantPageContext value={pageValue}>
+      <AssistantSidebarContext value={value}>{children}</AssistantSidebarContext>
+    </AssistantPageContext>
   );
 }
 

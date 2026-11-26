@@ -4,9 +4,9 @@ import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ALL_CATEGORY_LABEL, formatYen, type ExpenseItem } from "@/features/expenses/model";
+import { ALL_CATEGORY_LABEL, formatYen } from "@/features/expenses/model";
 import { cn } from "@/lib/utils";
-import { getByPath } from "../data-model";
+import { getByPath, toPrimitiveString } from "../data-model";
 import type { A2UIComponent } from "../types";
 import type { A2UIRenderContext } from "./render-context";
 
@@ -21,6 +21,17 @@ const categoryRowsSchema = z
   .and(z.union([z.object({ ratio: z.number() }), z.object({ ratioPercent: z.number() })]))
   .array();
 
+const expenseRowsSchema = z
+  .object({
+    id: z.union([z.number(), z.string()]),
+    title: z.string(),
+    amount: z.number(),
+    category: z.string().optional().default(""),
+    spentAt: z.string().optional().default(""),
+    note: z.string().optional().default(""),
+  })
+  .array();
+
 export function renderExpenseNode(node: ExpenseNode, ctx: A2UIRenderContext): ReactNode {
   const { surfaceId, mergedModel, pending, compact, onAction } = ctx;
 
@@ -28,7 +39,7 @@ export function renderExpenseNode(node: ExpenseNode, ctx: A2UIRenderContext): Re
     case "CategoryBreakdown": {
       const data = getByPath(mergedModel, node.dataPath);
       const parsed = categoryRowsSchema.safeParse(data);
-      const items = parsed.success ? parsed.data.sort((a, b) => b.total - a.total) : [];
+      const items = parsed.success ? [...parsed.data].sort((a, b) => b.total - a.total) : [];
       if (items.length === 0) {
         return (
           <p key={node.id} className="text-muted-foreground py-4 text-center text-sm">
@@ -90,9 +101,10 @@ export function renderExpenseNode(node: ExpenseNode, ctx: A2UIRenderContext): Re
     }
 
     case "ExpenseList": {
-      const allItems = (getByPath(mergedModel, node.dataPath) as ExpenseItem[] | undefined) ?? [];
+      const parsedItems = expenseRowsSchema.safeParse(getByPath(mergedModel, node.dataPath));
+      const allItems = parsedItems.success ? parsedItems.data : [];
       const activeFilter = node.filterPath
-        ? String(getByPath(mergedModel, node.filterPath) ?? ALL_CATEGORY_LABEL)
+        ? toPrimitiveString(getByPath(mergedModel, node.filterPath), ALL_CATEGORY_LABEL)
         : ALL_CATEGORY_LABEL;
 
       const filtered =
@@ -123,18 +135,20 @@ export function renderExpenseNode(node: ExpenseNode, ctx: A2UIRenderContext): Re
               <div className="min-w-0 flex-1 space-y-0.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="truncate font-medium">{item.title}</span>
-                  {node.showCategory && <Badge variant="secondary">{item.category}</Badge>}
+                  {node.showCategory && item.category && (
+                    <Badge variant="secondary">{item.category}</Badge>
+                  )}
                 </div>
-                {(node.showDate || (node.showNote && item.note)) && (
+                {((node.showDate && item.spentAt) || (node.showNote && item.note)) && (
                   <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
-                    {node.showDate && <span>{item.spentAt}</span>}
+                    {node.showDate && item.spentAt && <span>{item.spentAt}</span>}
                     {node.showNote && item.note && <span>{item.note}</span>}
                   </div>
                 )}
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-semibold tabular-nums">{formatYen(item.amount)}</span>
-                {node.allowDelete && (
+                {node.allowDelete && typeof item.id === "number" && (
                   <Button
                     type="button"
                     variant="ghost"

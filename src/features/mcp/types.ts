@@ -8,7 +8,7 @@ export interface McpToolAnnotations {
   openWorldHint: boolean;
 }
 
-export interface McpToolDefinition<TInput extends z.ZodTypeAny = z.ZodTypeAny> {
+export interface McpToolDefinition<TInput extends z.ZodType = z.ZodType> {
   name: string;
   description: string;
   inputSchema: TInput;
@@ -16,7 +16,7 @@ export interface McpToolDefinition<TInput extends z.ZodTypeAny = z.ZodTypeAny> {
   execute: (args: z.infer<TInput>) => Promise<Record<string, unknown>>;
 }
 
-export function defineTool<TInput extends z.ZodTypeAny>(
+export function defineTool<TInput extends z.ZodType>(
   def: McpToolDefinition<TInput>,
 ): McpToolDefinition<TInput> {
   return def;

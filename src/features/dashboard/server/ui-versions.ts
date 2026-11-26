@@ -1,4 +1,4 @@
-import { asc, db, desc, eq } from "void/db";
+import { asc, db, eq } from "void/db";
 import { uiVersions, type UiVersion } from "@schema";
 import { PRESET_UI_VERSIONS } from "@/features/a2ui/presets";
 import { DASHBOARD_SURFACE_ID, type A2UIMessage } from "@/features/a2ui/types";
@@ -21,11 +21,13 @@ async function activateUiVersion(
   const target = rows.find(predicate);
   if (!target) return null;
 
-  await db
-    .update(uiVersions)
-    .set({ isActive: 0 })
-    .where(eq(uiVersions.surfaceId, DASHBOARD_SURFACE_ID));
-  await db.update(uiVersions).set({ isActive: 1 }).where(eq(uiVersions.id, target.id));
+  await db.batch([
+    db
+      .update(uiVersions)
+      .set({ isActive: 0 })
+      .where(eq(uiVersions.surfaceId, DASHBOARD_SURFACE_ID)),
+    db.update(uiVersions).set({ isActive: 1 }).where(eq(uiVersions.id, target.id)),
+  ]);
 
   return { ...target, isActive: 1 };
 }
@@ -69,33 +71,32 @@ export async function createAndActivateUiVersion(input: {
   if (!validated.ok) {
     throw new Error(validated.error);
   }
-  await ensureDefaultUiVersions();
 
-  const existing = await db
-    .select({ version: uiVersions.version })
-    .from(uiVersions)
-    .where(eq(uiVersions.surfaceId, DASHBOARD_SURFACE_ID))
-    .orderBy(desc(uiVersions.version))
-    .limit(1);
+  const rows = await ensureDefaultUiVersions();
+  const nextVersion = (rows.at(-1)?.version ?? 0) + 1;
 
-  const nextVersion = (existing[0]?.version ?? 0) + 1;
+  const [, createdRows] = await db.batch([
+    db
+      .update(uiVersions)
+      .set({ isActive: 0 })
+      .where(eq(uiVersions.surfaceId, DASHBOARD_SURFACE_ID)),
+    db
+      .insert(uiVersions)
+      .values({
+        surfaceId: DASHBOARD_SURFACE_ID,
+        version: nextVersion,
+        name: input.name.trim(),
+        description: (input.description ?? "").trim(),
+        messagesJson: JSON.stringify(validated.messages, null, 2),
+        isActive: 1,
+      })
+      .returning(),
+  ]);
 
-  await db
-    .update(uiVersions)
-    .set({ isActive: 0 })
-    .where(eq(uiVersions.surfaceId, DASHBOARD_SURFACE_ID));
+  const created = createdRows[0];
+  if (!created) {
+    throw new Error("UI バージョンの保存に失敗しました");
+  }
 
-  const [created] = await db
-    .insert(uiVersions)
-    .values({
-      surfaceId: DASHBOARD_SURFACE_ID,
-      version: nextVersion,
-      name: input.name.trim(),
-      description: (input.description ?? "").trim(),
-      messagesJson: JSON.stringify(validated.messages, null, 2),
-      isActive: 1,
-    })
-    .returning();
-
-  return created!;
+  return created;
 }

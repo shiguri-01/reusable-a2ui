@@ -4,6 +4,7 @@ import {
   DndContext,
   KeyboardSensor,
   PointerSensor,
+  useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -22,6 +23,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { isContainerComponent, type EditableSurfaceGraph } from "../lib/a2ui-builder";
 import { COMPONENT_META, getComponentDisplayParts } from "../lib/catalog-registry";
+
+const OUTLINE_EMPTY_CONTAINER_DROP_PREFIX = "outline-container-drop:";
 
 interface StructureOutlineProps {
   graph: EditableSurfaceGraph;
@@ -64,21 +67,21 @@ export function StructureOutline({
     const activeId = String(active.id);
     const overId = String(over.id);
 
-    const overParentId = graph.parentById.get(overId);
-    if (overParentId) {
-      const overParent = graph.componentsById.get(overParentId);
-      if (overParent && isContainerComponent(overParent)) {
-        const targetIndex = overParent.children.indexOf(overId);
-        if (targetIndex !== -1) {
-          onMove(activeId, overParentId, targetIndex);
-          return;
-        }
-      }
+    if (overId.startsWith(OUTLINE_EMPTY_CONTAINER_DROP_PREFIX)) {
+      const targetContainerId = overId.slice(OUTLINE_EMPTY_CONTAINER_DROP_PREFIX.length);
+      onMove(activeId, targetContainerId, 0);
+      return;
     }
 
-    const overNode = graph.componentsById.get(overId);
-    if (overNode && isContainerComponent(overNode)) {
-      onMove(activeId, overNode.id, overNode.children.length);
+    const overParentId = graph.parentById.get(overId);
+    if (!overParentId) return;
+
+    const overParent = graph.componentsById.get(overParentId);
+    if (!overParent || !isContainerComponent(overParent)) return;
+
+    const targetIndex = overParent.children.indexOf(overId);
+    if (targetIndex !== -1) {
+      onMove(activeId, overParentId, targetIndex);
     }
   };
 
@@ -104,12 +107,16 @@ export function StructureOutline({
         onDelete={() => onDelete(node.id)}
         onRequestAdd={() => onRequestAdd(node.id)}
       >
-        {container && !isCollapsed && node.children.length > 0 && (
-          <SortableContext items={node.children} strategy={verticalListSortingStrategy}>
-            <div className="border-border ml-4 space-y-0.5 border-l pl-2 pt-0.5">
-              {node.children.map(renderSubtree)}
-            </div>
-          </SortableContext>
+        {container && !isCollapsed && (
+          <div className="border-border ml-4 space-y-0.5 border-l pt-0.5 pl-2">
+            {node.children.length > 0 ? (
+              <SortableContext items={node.children} strategy={verticalListSortingStrategy}>
+                {node.children.map(renderSubtree)}
+              </SortableContext>
+            ) : (
+              <EmptyOutlineDropzone containerId={node.id} />
+            )}
+          </div>
         )}
       </SortableTreeRow>
     );
@@ -150,7 +157,7 @@ export function StructureOutline({
         </div>
 
         {rootNode.children.length === 0 ? (
-          <p className="text-muted-foreground px-2 py-3 text-sm">まだブロックがありません</p>
+          <EmptyOutlineDropzone containerId={rootNode.id} label="まだブロックがありません" />
         ) : (
           <SortableContext items={rootNode.children} strategy={verticalListSortingStrategy}>
             <div className="space-y-0.5">{rootNode.children.map(renderSubtree)}</div>
@@ -158,6 +165,32 @@ export function StructureOutline({
         )}
       </div>
     </DndContext>
+  );
+}
+
+function EmptyOutlineDropzone({
+  containerId,
+  label = "空の枠（ドロップ可能）",
+}: {
+  containerId: string;
+  label?: string;
+}) {
+  const { isOver, setNodeRef } = useDroppable({
+    id: `${OUTLINE_EMPTY_CONTAINER_DROP_PREFIX}${containerId}`,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "rounded-md border border-dashed px-2 py-1.5 text-xs transition-colors",
+        isOver
+          ? "border-primary bg-primary/10 text-primary"
+          : "text-muted-foreground border-transparent",
+      )}
+    >
+      {label}
+    </div>
   );
 }
 

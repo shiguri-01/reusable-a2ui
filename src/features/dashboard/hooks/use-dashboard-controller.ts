@@ -2,12 +2,7 @@ import { useMemo, useState } from "react";
 import { action } from "@void/react";
 import type { UiVersion } from "@schema";
 import { getByPath, type DataModel } from "@/features/a2ui/data-model";
-import {
-  a2uiMessagesSchema,
-  type A2UIAction,
-  type A2UIComponent,
-  type A2UIMessage,
-} from "@/features/a2ui/types";
+import type { A2UIAction, A2UIComponent, A2UIMessage } from "@/features/a2ui/types";
 import type { AiPreviewDraft, DashboardEditBase } from "@/features/ai-chat/types";
 import { runExpenseA2UIAction, type ExpenseActionResult } from "@/features/expenses/actions";
 import {
@@ -17,20 +12,15 @@ import {
   type ExpenseItem,
 } from "@/features/expenses/model";
 import {
-  createEmptyDashboardMessages,
-  duplicateComponent,
   extractEditableSurface,
-  insertBlock as insertBlockIntoMessages,
-  isContainerComponent,
-  moveComponent,
-  moveComponentRelative,
   parseAndValidateDashboardJson,
-  removeComponent,
-  updateComponent,
   type BlockBlueprint,
   type EditableSurfaceGraph,
 } from "../lib/a2ui-builder";
 import { matchesProposalBase, type DashboardProposal } from "../lib/ai-proposal";
+import { useDashboardDraft, type BuilderCanvasMode } from "./use-dashboard-draft";
+
+export type { BuilderCanvasMode } from "./use-dashboard-draft";
 
 export interface DashboardFeedback {
   type: "error" | "success";
@@ -38,7 +28,6 @@ export interface DashboardFeedback {
 }
 
 export type CustomizePanelTab = "builder" | "json" | "history";
-export type BuilderCanvasMode = "edit" | "preview" | "split";
 
 export interface DashboardBuilderState {
   messages: A2UIMessage[];
@@ -81,35 +70,6 @@ export interface DashboardBuilderActions {
   saveAsNewVersion: (input: { name: string; description: string }) => Promise<boolean>;
 }
 
-interface DraftOrigin {
-  label: string;
-  proposal?: Pick<AiPreviewDraft, "draftId" | "description">;
-}
-
-interface DraftSnapshot {
-  messages: A2UIMessage[];
-  origin?: DraftOrigin;
-  invalidJson?: { text: string; error: string };
-}
-
-interface DraftHistoryState {
-  past: DraftSnapshot[];
-  present: DraftSnapshot;
-  future: DraftSnapshot[];
-  resetEpoch: number;
-}
-
-const MAX_HISTORY_STEPS = 40;
-
-function parseMessages(json: string): A2UIMessage[] {
-  try {
-    const parsed = a2uiMessagesSchema.safeParse(JSON.parse(json));
-    return parsed.success ? parsed.data : createEmptyDashboardMessages();
-  } catch {
-    return createEmptyDashboardMessages();
-  }
-}
-
 interface UseDashboardControllerOptions {
   expenses: ExpenseItem[];
   uiVersions: UiVersion[];
@@ -123,17 +83,12 @@ export function useDashboardController({
   activeVersionId,
   onSendPromptToAssistant,
 }: UseDashboardControllerOptions) {
-  const activeVersion =
-    uiVersions.find((v) => v.id === activeVersionId) ?? uiVersions[uiVersions.length - 1];
+  const activeVersion = uiVersions.find((v) => v.id === activeVersionId) ?? uiVersions.at(-1);
 
-  const activeMessages = useMemo(
-    () => parseMessages(activeVersion?.messagesJson ?? "[]"),
-    [activeVersion?.messagesJson],
-  );
-  const canonicalActiveJson = useMemo(
-    () => JSON.stringify(activeMessages, null, 2),
-    [activeMessages],
-  );
+  const draft = useDashboardDraft({
+    activeVersionId: activeVersion?.id,
+    activeMessagesJson: activeVersion?.messagesJson,
+  });
 
   const [formState, setFormState] = useState<Record<string, unknown>>(() =>
     createInitialExpenseForm(),
@@ -145,37 +100,8 @@ export function useDashboardController({
   const [feedback, setFeedback] = useState<DashboardFeedback | null>(null);
 
   const [customizeTab, setCustomizeTab] = useState<CustomizePanelTab>("builder");
-  const [canvasMode, setCanvasMode] = useState<BuilderCanvasMode>("edit");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  const [syncedVersionId, setSyncedVersionId] = useState<number | undefined>(activeVersion?.id);
-  const [history, setHistory] = useState<DraftHistoryState>(() => ({
-    past: [],
-    present: { messages: activeMessages },
-    future: [],
-    resetEpoch: 0,
-  }));
-  const [rawJson, setRawJson] = useState<string>(() => canonicalActiveJson);
-  const [jsonError, setJsonError] = useState<string | null>(null);
-
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  const [paletteTargetParentId, setPaletteTargetParentId] = useState<string>("root");
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveServerError, setSaveServerError] = useState<string | null>(null);
-
-  // Sync builder baseline whenever the active version ID changes externally (e.g. version switch or save).
-  if (activeVersion?.id !== syncedVersionId) {
-    setSyncedVersionId(activeVersion?.id);
-    setHistory((prev) => ({
-      past: [],
-      present: { messages: activeMessages },
-      future: [],
-      resetEpoch: prev.resetEpoch + 1,
-    }));
-    setRawJson(canonicalActiveJson);
-    setJsonError(null);
-    setSelectedId(null);
-  }
 
   const [proposal, setProposal] = useState<DashboardProposal | null>(null);
   const [appliedDraftIds, setAppliedDraftIds] = useState<Record<string, boolean>>({});
@@ -189,180 +115,19 @@ export function useDashboardController({
     [expenses, formState, filterState],
   );
 
-  const draftMessages = history.present.messages;
-  const draftGraph = useMemo(() => extractEditableSurface(draftMessages), [draftMessages]);
-  const canonicalDraftJson = useMemo(() => JSON.stringify(draftMessages, null, 2), [draftMessages]);
-  const isDirty = canonicalDraftJson !== canonicalActiveJson || jsonError !== null;
-
-  const captureDraft = (snapshot: DraftSnapshot): DraftSnapshot => ({
-    ...snapshot,
-    invalidJson: jsonError ? { text: rawJson, error: jsonError } : undefined,
-  });
-
-  const commitBuilderMessages = (
-    nextMessages: A2UIMessage[],
-    options?: { bumpEpoch?: boolean; origin?: DraftOrigin | null; rawJson?: string },
-  ) => {
-    const nextJson = JSON.stringify(nextMessages, null, 2);
-    setHistory((prev) => {
-      const origin =
-        options?.origin === undefined ? prev.present.origin : (options.origin ?? undefined);
-      if (
-        origin === prev.present.origin &&
-        JSON.stringify(prev.present.messages) === JSON.stringify(nextMessages)
-      ) {
-        return prev;
-      }
-      const previous = options?.origin?.proposal ? captureDraft(prev.present) : prev.present;
-      return {
-        past: [...prev.past.slice(-(MAX_HISTORY_STEPS - 1)), previous],
-        present: { messages: nextMessages, origin },
-        future: [],
-        resetEpoch: options?.bumpEpoch ? prev.resetEpoch + 1 : prev.resetEpoch,
-      };
-    });
-    setRawJson(options?.rawJson ?? nextJson);
-    setJsonError(null);
-  };
-
-  const undo = () => {
-    if (history.past.length === 0) return;
-    const previous = history.past[history.past.length - 1]!;
-    setHistory((prev) => ({
-      past: prev.past.slice(0, -1),
-      present: { messages: previous.messages, origin: previous.origin },
-      future: [captureDraft(prev.present), ...prev.future],
-      resetEpoch: prev.resetEpoch + 1,
-    }));
-    setRawJson(previous.invalidJson?.text ?? JSON.stringify(previous.messages, null, 2));
-    setJsonError(previous.invalidJson?.error ?? null);
-  };
-
-  const redo = () => {
-    if (history.future.length === 0) return;
-    const next = history.future[0]!;
-    setHistory((prev) => ({
-      past: [...prev.past, captureDraft(prev.present)],
-      present: { messages: next.messages, origin: next.origin },
-      future: prev.future.slice(1),
-      resetEpoch: prev.resetEpoch + 1,
-    }));
-    setRawJson(next.invalidJson?.text ?? JSON.stringify(next.messages, null, 2));
-    setJsonError(next.invalidJson?.error ?? null);
-  };
-
-  const resetDraft = () => {
-    setHistory((prev) => ({
-      past: [],
-      present: { messages: activeMessages },
-      future: [],
-      resetEpoch: prev.resetEpoch + 1,
-    }));
-    setRawJson(canonicalActiveJson);
-    setJsonError(null);
-    setSelectedId(null);
-  };
-
-  const resolveDefaultInsertPlacement = (explicitParentId?: string) => {
-    if (explicitParentId && draftGraph.componentsById.has(explicitParentId)) {
-      return { parentId: explicitParentId };
-    }
-    if (selectedId) {
-      const selectedComp = draftGraph.componentsById.get(selectedId);
-      if (selectedComp && isContainerComponent(selectedComp)) {
-        return { parentId: selectedComp.id };
-      }
-      const parentId = draftGraph.parentById.get(selectedId);
-      const parentComp = parentId ? draftGraph.componentsById.get(parentId) : undefined;
-      if (parentComp && isContainerComponent(parentComp)) {
-        const idx = parentComp.children.indexOf(selectedId);
-        return { parentId: parentComp.id, index: idx + 1 };
-      }
-    }
-    return { parentId: draftGraph.rootId };
-  };
-
-  const openPalette = (parentId?: string) => {
-    const placement = resolveDefaultInsertPlacement(parentId);
-    setPaletteTargetParentId(placement.parentId);
-    setPaletteOpen(true);
-  };
-
-  const insertBlock = (blueprint: BlockBlueprint, parentId?: string) => {
-    const placement = parentId
-      ? { parentId }
-      : resolveDefaultInsertPlacement(paletteTargetParentId);
-    const { messages: nextMessages, insertedId } = insertBlockIntoMessages(
-      draftMessages,
-      blueprint,
-      placement,
-    );
-    commitBuilderMessages(nextMessages);
-    setSelectedId(insertedId);
-  };
-
-  const updateNode = (nodeId: string, next: A2UIComponent) => {
-    const nextMessages = updateComponent(draftMessages, nodeId, () => next);
-    commitBuilderMessages(nextMessages);
-  };
-
-  const moveNode = (activeId: string, targetParentId: string, targetIndex?: number) => {
-    const nextMessages = moveComponent(draftMessages, activeId, targetParentId, targetIndex);
-    commitBuilderMessages(nextMessages, { bumpEpoch: true });
-  };
-
-  const moveNodeRelative = (nodeId: string, direction: "up" | "down") => {
-    const nextMessages = moveComponentRelative(draftMessages, nodeId, direction);
-    commitBuilderMessages(nextMessages, { bumpEpoch: true });
-  };
-
-  const duplicateNode = (nodeId: string) => {
-    const { messages: nextMessages, duplicatedId } = duplicateComponent(draftMessages, nodeId);
-    commitBuilderMessages(nextMessages);
-    if (duplicatedId) {
-      setSelectedId(duplicatedId);
-    }
-  };
-
-  const deleteNode = (nodeId: string) => {
-    const nextMessages = removeComponent(draftMessages, nodeId);
-    commitBuilderMessages(nextMessages);
-    if (selectedId === nodeId) {
-      setSelectedId(null);
-    }
-  };
-
-  const updateRawJson = (nextJson: string) => {
-    setRawJson(nextJson);
-    const validated = parseAndValidateDashboardJson(nextJson);
-    if (!validated.ok) {
-      setJsonError(validated.error);
-      return;
-    }
-    commitBuilderMessages(validated.messages, { bumpEpoch: true, rawJson: nextJson });
-  };
-
-  const formatRawJson = () => {
-    const validated = parseAndValidateDashboardJson(rawJson);
-    if (validated.ok) {
-      setRawJson(JSON.stringify(validated.messages, null, 2));
-      setJsonError(null);
-    }
-  };
-
   const loadFromMessagesJson = (messagesJson: string, baseLabel?: string) => {
     const validated = parseAndValidateDashboardJson(messagesJson);
     if (!validated.ok) {
       setFeedback({ type: "error", message: validated.error });
       return;
     }
-    commitBuilderMessages(validated.messages, {
+    draft.commitBuilderMessages(validated.messages, {
       bumpEpoch: true,
       origin: baseLabel ? { label: baseLabel } : null,
     });
-    setSelectedId(null);
+    draft.setSelectedId(null);
     setProposal(null);
-    setCanvasMode("edit");
+    draft.setCanvasMode("edit");
   };
 
   const handleDataModelChange = (next: DataModel) => {
@@ -430,7 +195,7 @@ export function useDashboardController({
   };
 
   const nextVersionNumber = uiVersions.reduce((max, v) => Math.max(max, v.version), 0) + 1;
-  const origin = history.present.origin;
+  const { origin } = draft;
   const suggestedVersionName = origin?.proposal
     ? origin.label
     : origin
@@ -444,8 +209,8 @@ export function useDashboardController({
     description: string;
   }): Promise<boolean> => {
     setSaveServerError(null);
-    if (jsonError) {
-      setSaveServerError(jsonError);
+    if (draft.jsonError) {
+      setSaveServerError(draft.jsonError);
       return false;
     }
     const name = input.name.trim() || suggestedVersionName;
@@ -457,7 +222,7 @@ export function useDashboardController({
         data: {
           name,
           description: input.description.trim(),
-          messagesJson: canonicalDraftJson,
+          messagesJson: draft.canonicalDraftJson,
         },
       });
       if (!res.ok) {
@@ -475,79 +240,83 @@ export function useDashboardController({
     }
   };
 
-  const handlePreviewAiVersion = (draft: AiPreviewDraft) => {
-    setProposal({ draft, mode: "split" });
+  const handlePreviewAiVersion = (previewDraft: AiPreviewDraft) => {
+    setProposal({ draft: previewDraft, mode: "split" });
   };
 
   const setProposalMode = (mode: DashboardProposal["mode"]) => {
     setProposal((prev) => (prev && prev.mode !== mode ? { ...prev, mode } : prev));
   };
 
-  const adoptAiProposal = (draft: AiPreviewDraft) => {
-    commitBuilderMessages(draft.messages, {
+  const adoptAiProposal = (proposalDraft: AiPreviewDraft) => {
+    draft.commitBuilderMessages(proposalDraft.messages, {
       bumpEpoch: true,
       origin: {
-        label: draft.name,
-        proposal: { draftId: draft.draftId, description: draft.description },
+        label: proposalDraft.name,
+        proposal: { draftId: proposalDraft.draftId, description: proposalDraft.description },
       },
     });
     setProposal(null);
-    setSelectedId(
-      selectedId && extractEditableSurface(draft.messages).componentsById.has(selectedId)
-        ? selectedId
+    draft.setSelectedId(
+      draft.selectedId &&
+        extractEditableSurface(proposalDraft.messages).componentsById.has(draft.selectedId)
+        ? draft.selectedId
         : null,
     );
     setFeedback(null);
   };
 
-  const receiveAiProposal = (draft: AiPreviewDraft, base?: DashboardEditBase) => {
+  const receiveAiProposal = (proposalDraft: AiPreviewDraft, base?: DashboardEditBase) => {
     if (
-      matchesProposalBase(base, { messages: draftMessages, versionId: activeVersion?.id }) &&
-      !jsonError &&
+      matchesProposalBase(base, {
+        messages: draft.draftMessages,
+        versionId: activeVersion?.id,
+      }) &&
+      !draft.jsonError &&
       !saveDialogOpen &&
       !pending &&
       !proposal
     ) {
-      adoptAiProposal(draft);
+      adoptAiProposal(proposalDraft);
       return;
     }
-    setProposal({ draft, mode: null });
+    setProposal({ draft: proposalDraft, mode: null });
     setFeedback(null);
   };
 
   const builder: DashboardBuilderState & DashboardBuilderActions = {
-    messages: draftMessages,
-    graph: draftGraph,
-    rawJson,
-    jsonError,
-    selectedId,
-    canvasMode,
-    isDirty,
-    canSave: isDirty && !jsonError && !pending,
-    canUndo: history.past.length > 0,
-    canRedo: history.future.length > 0,
-    resetEpoch: history.resetEpoch,
-    paletteOpen,
-    paletteTargetParentId,
+    messages: draft.draftMessages,
+    graph: draft.draftGraph,
+    rawJson: draft.rawJson,
+    jsonError: draft.jsonError,
+    selectedId: draft.selectedId,
+    canvasMode: draft.canvasMode,
+    isDirty: draft.isDirty,
+    canSave: draft.isDirty && !draft.jsonError && !pending,
+    canUndo: draft.canUndo,
+    canRedo: draft.canRedo,
+    resetEpoch: draft.resetEpoch,
+    paletteOpen: draft.paletteOpen,
+    paletteTargetParentId: draft.paletteTargetParentId,
     saveDialogOpen,
     saveServerError,
     suggestedVersionName,
     suggestedDescription,
-    setSelectedId,
-    setCanvasMode,
-    undo,
-    redo,
-    resetDraft,
-    openPalette,
-    setPaletteOpen,
-    insertBlock,
-    updateNode,
-    moveNode,
-    moveNodeRelative,
-    duplicateNode,
-    deleteNode,
-    updateRawJson,
-    formatRawJson,
+    setSelectedId: draft.setSelectedId,
+    setCanvasMode: draft.setCanvasMode,
+    undo: draft.undo,
+    redo: draft.redo,
+    resetDraft: draft.resetDraft,
+    openPalette: draft.openPalette,
+    setPaletteOpen: draft.setPaletteOpen,
+    insertBlock: draft.insertBlock,
+    updateNode: draft.updateNode,
+    moveNode: draft.moveNode,
+    moveNodeRelative: draft.moveNodeRelative,
+    duplicateNode: draft.duplicateNode,
+    deleteNode: draft.deleteNode,
+    updateRawJson: draft.updateRawJson,
+    formatRawJson: draft.formatRawJson,
     loadFromMessagesJson,
     setSaveDialogOpen: (open) => {
       if (open) setSaveServerError(null);
@@ -558,7 +327,7 @@ export function useDashboardController({
 
   return {
     activeVersion,
-    messages: activeMessages,
+    messages: draft.activeMessages,
     dataModel,
     pending,
     feedback,

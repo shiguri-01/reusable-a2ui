@@ -169,7 +169,6 @@ export class CodexAppServerClient {
 
   subscribeStatus(listener: StatusListener): () => void {
     this.statusListeners.add(listener);
-    listener(this.status);
     return () => {
       this.statusListeners.delete(listener);
     };

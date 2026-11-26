@@ -38,14 +38,14 @@ const componentCommonFields = {
   "@catalogId": z.string().min(1).optional(),
 };
 
-export const a2uiComponentSchema = z.discriminatedUnion("component", [
-  z.object({
+export const a2uiComponentSchemas = {
+  Column: z.object({
     ...componentCommonFields,
     component: z.literal("Column"),
     children: z.array(z.string()),
     gap: z.enum(["sm", "md", "lg"]).optional(),
   }),
-  z.object({
+  Row: z.object({
     ...componentCommonFields,
     component: z.literal("Row"),
     children: z.array(z.string()),
@@ -54,37 +54,37 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
     justify: z.enum(["start", "between", "end"]).optional(),
     wrap: z.boolean().optional(),
   }),
-  z.object({
+  Grid: z.object({
     ...componentCommonFields,
     component: z.literal("Grid"),
     children: z.array(z.string()),
     columns: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]).optional(),
     gap: z.enum(["sm", "md", "lg"]).optional(),
   }),
-  z.object({
+  Card: z.object({
     ...componentCommonFields,
     component: z.literal("Card"),
     title: boundStringSchema.optional(),
     description: boundStringSchema.optional(),
     children: z.array(z.string()),
   }),
-  z.object({
+  Divider: z.object({
     ...componentCommonFields,
     component: z.literal("Divider"),
   }),
-  z.object({
+  Text: z.object({
     ...componentCommonFields,
     component: z.literal("Text"),
     text: boundStringSchema,
     variant: z.enum(["title", "subtitle", "body", "caption", "metric"]).optional(),
   }),
-  z.object({
+  Badge: z.object({
     ...componentCommonFields,
     component: z.literal("Badge"),
     text: boundStringSchema,
     variant: z.enum(["default", "secondary", "outline", "destructive"]).optional(),
   }),
-  z.object({
+  MetricCard: z.object({
     ...componentCommonFields,
     component: z.literal("MetricCard"),
     label: z.string(),
@@ -92,7 +92,7 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
     helper: boundStringSchema.optional(),
     badge: boundStringSchema.optional(),
   }),
-  z.object({
+  ProgressBar: z.object({
     ...componentCommonFields,
     component: z.literal("ProgressBar"),
     label: z.string(),
@@ -100,7 +100,7 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
     max: boundNumberSchema.optional(),
     detail: boundStringSchema.optional(),
   }),
-  z
+  CategoryBreakdown: z
     .object({
       ...componentCommonFields,
       component: z.literal("CategoryBreakdown"),
@@ -114,14 +114,14 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
         .describe("集計の年月・日付範囲・「全期間」。指定するとチャット内の各行から明細を開ける。"),
     })
     .describe("カテゴリ別の支出額と構成比を金額順の横棒で比較する。"),
-  z.object({
+  FilterChips: z.object({
     ...componentCommonFields,
     component: z.literal("FilterChips"),
     bindPath: z.string(),
     options: z.array(z.string()),
     allLabel: z.string().optional(),
   }),
-  z.object({
+  TextField: z.object({
     ...componentCommonFields,
     component: z.literal("TextField"),
     label: z.string(),
@@ -129,7 +129,7 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
     placeholder: z.string().optional(),
     required: z.boolean().optional(),
   }),
-  z.object({
+  NumberField: z.object({
     ...componentCommonFields,
     component: z.literal("NumberField"),
     label: z.string(),
@@ -138,20 +138,20 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
     min: z.number().optional(),
     suffix: z.string().optional(),
   }),
-  z.object({
+  DateField: z.object({
     ...componentCommonFields,
     component: z.literal("DateField"),
     label: z.string(),
     bindPath: z.string(),
   }),
-  z.object({
+  SelectField: z.object({
     ...componentCommonFields,
     component: z.literal("SelectField"),
     label: z.string(),
     bindPath: z.string(),
     options: z.array(z.string()),
   }),
-  z.object({
+  Button: z.object({
     ...componentCommonFields,
     component: z.literal("Button"),
     label: z.string(),
@@ -161,7 +161,7 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
     ),
     fullWidth: z.boolean().optional(),
   }),
-  z.object({
+  ExpenseList: z.object({
     ...componentCommonFields,
     component: z.literal("ExpenseList"),
     dataPath: z.string(),
@@ -176,7 +176,7 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
     emptyText: z.string().optional(),
     limit: z.number().int().positive().optional(),
   }),
-  z.object({
+  KeyValueList: z.object({
     ...componentCommonFields,
     component: z.literal("KeyValueList"),
     items: z.array(
@@ -187,13 +187,35 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
       }),
     ),
   }),
-  z.object({
+  Alert: z.object({
     ...componentCommonFields,
     component: z.literal("Alert"),
     title: boundStringSchema.optional(),
     text: boundStringSchema,
     variant: z.enum(["info", "success", "warning", "destructive"]).optional(),
   }),
+} as const;
+
+export const a2uiComponentSchema = z.discriminatedUnion("component", [
+  a2uiComponentSchemas.Column,
+  a2uiComponentSchemas.Row,
+  a2uiComponentSchemas.Grid,
+  a2uiComponentSchemas.Card,
+  a2uiComponentSchemas.Divider,
+  a2uiComponentSchemas.Text,
+  a2uiComponentSchemas.Badge,
+  a2uiComponentSchemas.MetricCard,
+  a2uiComponentSchemas.ProgressBar,
+  a2uiComponentSchemas.CategoryBreakdown,
+  a2uiComponentSchemas.FilterChips,
+  a2uiComponentSchemas.TextField,
+  a2uiComponentSchemas.NumberField,
+  a2uiComponentSchemas.DateField,
+  a2uiComponentSchemas.SelectField,
+  a2uiComponentSchemas.Button,
+  a2uiComponentSchemas.ExpenseList,
+  a2uiComponentSchemas.KeyValueList,
+  a2uiComponentSchemas.Alert,
 ]);
 
 export type A2UIComponent = z.infer<typeof a2uiComponentSchema>;

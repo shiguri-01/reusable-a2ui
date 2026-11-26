@@ -1,4 +1,5 @@
 import { action } from "@void/react";
+import { toPrimitiveString } from "@/features/a2ui/data-model";
 import type { A2UIAction } from "@/features/a2ui/types";
 import { EXPENSE_CATEGORIES, getTodayIso } from "./model";
 
@@ -13,11 +14,11 @@ export async function runExpenseA2UIAction(
   target: "dashboard" | "expenses",
 ): Promise<ExpenseActionResult> {
   if (act.name === "createExpense") {
-    const title = String(sourceForm.title ?? "").trim();
+    const title = toPrimitiveString(sourceForm.title).trim();
     const amount = Number(sourceForm.amount);
-    const category = String(sourceForm.category ?? EXPENSE_CATEGORIES[0]);
-    const spentAt = String(sourceForm.spentAt ?? getTodayIso()) || getTodayIso();
-    const note = String(sourceForm.note ?? "").trim();
+    const category = toPrimitiveString(sourceForm.category).trim() || EXPENSE_CATEGORIES[0];
+    const spentAt = toPrimitiveString(sourceForm.spentAt).trim() || getTodayIso();
+    const note = toPrimitiveString(sourceForm.note).trim();
 
     if (!title) {
       return { ok: false, message: "内容を入力してください。" };

@@ -1,6 +1,14 @@
+@layer ui-sdk;
+
 @import "tailwindcss";
 @import "streamdown/styles.css";
 @source "../node_modules/streamdown/dist/*.js";
+
+@layer ui-sdk {
+  :where([data-slot][hidden]:not([hidden="until-found"])) {
+    display: none !important;
+  }
+}
 
 @custom-variant dark (&:is(.dark *));
 

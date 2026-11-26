@@ -1,7 +1,6 @@
-import { defineHandler, type InferProps } from "void";
+import { defineHandler, defineHead, type InferProps } from "void";
 import { ValidationError } from "void/handler";
-import { db, desc, eq } from "void/db";
-import { expenses, insertExpenseSchema } from "@schema";
+import { insertExpenseSchema } from "@schema";
 import { z } from "zod";
 import { DASHBOARD_SURFACE_ID } from "@/features/a2ui/types";
 import { validateA2UISurfaceMessages } from "@/features/a2ui/validate";
@@ -10,17 +9,22 @@ import {
   createAndActivateUiVersion,
   ensureDefaultUiVersions,
 } from "@/features/dashboard/server/ui-versions";
+import {
+  createExpenseRecord,
+  deleteExpenseById,
+  deleteExpenseSchema,
+  listAllExpenses,
+} from "@/features/expenses/server";
 
 export type Props = InferProps<typeof loader>;
 
 export const loader = defineHandler(async () => {
   const [expenseRows, versionRows] = await Promise.all([
-    db.select().from(expenses).orderBy(desc(expenses.spentAt), desc(expenses.id)),
+    listAllExpenses(),
     ensureDefaultUiVersions(),
   ]);
 
-  const activeVersion =
-    versionRows.find((v) => v.isActive === 1) ?? versionRows[versionRows.length - 1];
+  const activeVersion = versionRows.find((v) => v.isActive === 1) ?? versionRows.at(-1);
 
   return {
     expenses: expenseRows,
@@ -29,19 +33,21 @@ export const loader = defineHandler(async () => {
   };
 });
 
+export const head = defineHead<Props>(() => ({
+  title: "ダッシュボード",
+}));
+
 export const actions = {
   createExpense: defineHandler.withValidator({
     body: insertExpenseSchema,
   })(async (_c, { body }) => {
-    await db.insert(expenses).values(body);
+    await createExpenseRecord(body);
   }),
 
   deleteExpense: defineHandler.withValidator({
-    body: z.object({
-      id: z.number().int().positive(),
-    }),
+    body: deleteExpenseSchema,
   })(async (_c, { body }) => {
-    await db.delete(expenses).where(eq(expenses.id, body.id));
+    await deleteExpenseById(body.id);
   }),
 
   activateVersion: defineHandler.withValidator({

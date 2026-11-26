@@ -22,15 +22,14 @@ interface DashboardViewProps {
 }
 
 export function DashboardView({ expenses, uiVersions, activeVersionId }: DashboardViewProps) {
-  const {
-    setDashboardHost,
-    consumePendingPreviewDraft,
-    requestAssistantPrompt,
-    visiblePanel,
-    openPanel,
-    closePanel,
-  } = useAssistantPage();
+  const { setDashboardHost, requestAssistantPrompt, visiblePanel, openPanel, closePanel } =
+    useAssistantPage();
   const [editing, setEditing] = useState(false);
+
+  if (visiblePanel === "customize" && !editing) {
+    setEditing(true);
+  }
+
   const isEditing = editing || visiblePanel === "customize";
 
   const controller = useDashboardController({
@@ -43,24 +42,12 @@ export function DashboardView({ expenses, uiVersions, activeVersionId }: Dashboa
   const isReviewingProposal = Boolean(controller.proposal?.mode);
   useDashboardShortcuts(controller.builder, isEditing && !isReviewingProposal);
 
-  useEffect(() => {
-    if (visiblePanel === "customize") setEditing(true);
-  }, [visiblePanel]);
-
   // Keep sidebar callbacks tied to the latest committed controller state.
   useLayoutEffect(() => {
     controllerRef.current = controller;
   });
 
   useSyncAssistantExpenses(expenses);
-
-  useEffect(() => {
-    const pendingDraft = consumePendingPreviewDraft();
-    if (pendingDraft) {
-      controllerRef.current.handlePreviewAiVersion(pendingDraft);
-      setEditing(true);
-    }
-  }, [consumePendingPreviewDraft]);
 
   useEffect(() => {
     setDashboardHost({

@@ -130,4 +130,41 @@ describe("validateA2UISurfaceMessages (v1.0)", () => {
     const state = buildSurfaceState(validated.messages);
     expect(state?.initialDataModel).toEqual({ note: "hello" });
   });
+
+  it("rejects cyclic component hierarchies and un-recreated deleted surfaces", () => {
+    const cyclic = validateA2UISurfaceMessages([
+      {
+        version: "1.0",
+        createSurface: {
+          surfaceId: "chat-inline",
+          catalogId: EXPENSE_CATALOG_ID,
+          components: [
+            { id: "root", component: "Column", children: ["card-a"] },
+            { id: "card-a", component: "Card", children: ["card-b"] },
+            { id: "card-b", component: "Card", children: ["card-a"] },
+          ],
+        },
+      },
+    ]);
+    expect(cyclic.ok).toBe(false);
+
+    const deleted = validateA2UISurfaceMessages([
+      ...inlineSurface,
+      {
+        version: "1.0",
+        deleteSurface: { surfaceId: "chat-inline" },
+      },
+    ]);
+    expect(deleted.ok).toBe(false);
+
+    const recreated = validateA2UISurfaceMessages([
+      ...inlineSurface,
+      {
+        version: "1.0",
+        deleteSurface: { surfaceId: "chat-inline" },
+      },
+      ...inlineSurface,
+    ]);
+    expect(recreated.ok).toBe(true);
+  });
 });

@@ -3,11 +3,11 @@ import {
   useEffect,
   useEffectEvent,
   useMemo,
-  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
 import { useChat } from "@ai-sdk/react";
+import type { UIMessage } from "ai";
 import { buildA2UIDeveloperInstructions, buildUserTurnPrompt } from "@/features/a2ui/prompt";
 import {
   CodexAppServerClient,
@@ -18,6 +18,32 @@ import { CodexChatTransport } from "../codex/transport";
 import type { AiPreviewDraft, DashboardEditBase } from "../types";
 
 const STORAGE_KEY_WS_URL = "reusable-a2ui:codex-ws-url:v3";
+
+function readStoredWsUrl(): string {
+  if (typeof window === "undefined") return DEFAULT_CODEX_WS_URL;
+  return window.localStorage.getItem(STORAGE_KEY_WS_URL)?.trim() || DEFAULT_CODEX_WS_URL;
+}
+
+function findActiveRunningTool(messages: UIMessage[]) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg?.role !== "assistant") continue;
+    for (let j = msg.parts.length - 1; j >= 0; j--) {
+      const part = msg.parts[j];
+      if (
+        part.type === "dynamic-tool" &&
+        (part.state === "input-available" || part.state === "input-streaming")
+      ) {
+        const params =
+          part.input && typeof part.input === "object" && !Array.isArray(part.input)
+            ? (part.input as Record<string, unknown>)
+            : undefined;
+        return { toolName: part.toolName, toolParams: params };
+      }
+    }
+  }
+  return null;
+}
 
 interface UseCodexChatOptions {
   currentPagePath?: string;
@@ -36,50 +62,14 @@ export function useCodexChat({
   onDataMutated,
   onDashboardProposed,
 }: UseCodexChatOptions) {
-  const [wsUrlInput, setWsUrlInput] = useState(DEFAULT_CODEX_WS_URL);
+  const [wsUrlInput, setWsUrlInput] = useState(readStoredWsUrl);
   const [pendingElicitations, setPendingElicitations] = useState<McpElicitationRequest[]>([]);
   const [autoApproveSession, setAutoApproveSession] = useState(false);
-
-  const transportCallbacksRef = useRef({
-    currentPagePath,
-    activeVersionName,
-    dashboardEditBase,
-    selectedBlock,
-    onDataMutated,
-    onDashboardProposed,
-  });
-
-  useEffect(() => {
-    transportCallbacksRef.current = {
-      currentPagePath,
-      activeVersionName,
-      dashboardEditBase,
-      selectedBlock,
-      onDataMutated,
-      onDashboardProposed,
-    };
-  }, [
-    currentPagePath,
-    activeVersionName,
-    dashboardEditBase,
-    selectedBlock,
-    onDataMutated,
-    onDashboardProposed,
-  ]);
 
   const client = useMemo(() => new CodexAppServerClient(DEFAULT_CODEX_WS_URL), []);
 
   const subscribeStatus = useCallback(
-    (onStoreChange: () => void) => {
-      let initialized = false;
-      return client.subscribeStatus(() => {
-        if (!initialized) {
-          initialized = true;
-          return;
-        }
-        onStoreChange();
-      });
-    },
+    (onStoreChange: () => void) => client.subscribeStatus(onStoreChange),
     [client],
   );
   const getStatusSnapshot = useCallback(() => client.getStatus(), [client]);
@@ -103,11 +93,7 @@ export function useCodexChat({
   });
 
   useEffect(() => {
-    const storedUrl = window.localStorage.getItem(STORAGE_KEY_WS_URL)?.trim();
-    if (storedUrl) {
-      setWsUrlInput(storedUrl);
-      client.setUrl(storedUrl);
-    }
+    client.setUrl(readStoredWsUrl());
 
     const unsubscribeStatus = client.subscribeStatus((nextStatus) => {
       if (nextStatus.state === "disconnected" || nextStatus.state === "error") {
@@ -139,55 +125,44 @@ export function useCodexChat({
       new CodexChatTransport({
         client,
         getDeveloperInstructions: buildA2UIDeveloperInstructions,
-        prepareTurn: (userText) => {
-          const { dashboardEditBase, currentPagePath, activeVersionName, selectedBlock } =
-            transportCallbacksRef.current;
-          return {
-            text: buildUserTurnPrompt({
-              userText,
-              currentPagePath,
-              activeVersionName,
-              selectedBlock,
-              currentMessagesJson: dashboardEditBase
-                ? JSON.stringify(dashboardEditBase.messages, null, 2)
-                : undefined,
-            }),
-            onDashboardProposed: (proposal) =>
-              transportCallbacksRef.current.onDashboardProposed(proposal, dashboardEditBase),
-          };
-        },
-        onDataMutated: (toolName) => transportCallbacksRef.current.onDataMutated(toolName),
+        prepareTurn: (userText) => ({ text: userText }),
         effort: "low",
       }),
     [client],
   );
+
+  useEffect(() => {
+    transport.updateHandlers({
+      prepareTurn: (userText) => ({
+        text: buildUserTurnPrompt({
+          userText,
+          currentPagePath,
+          activeVersionName,
+          selectedBlock,
+          currentMessagesJson: dashboardEditBase
+            ? JSON.stringify(dashboardEditBase.messages, null, 2)
+            : undefined,
+        }),
+        onDashboardProposed: (proposal) => onDashboardProposed(proposal, dashboardEditBase),
+      }),
+      onDataMutated,
+    });
+  }, [
+    transport,
+    currentPagePath,
+    activeVersionName,
+    dashboardEditBase,
+    selectedBlock,
+    onDataMutated,
+    onDashboardProposed,
+  ]);
 
   const { messages, sendMessage, status, stop, setMessages, error, clearError } = useChat({
     transport,
   });
 
   const isStreaming = status === "submitted" || status === "streaming";
-
-  const activeRunningTool = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i];
-      if (msg?.role !== "assistant") continue;
-      for (let j = msg.parts.length - 1; j >= 0; j--) {
-        const part = msg.parts[j];
-        if (
-          part.type === "dynamic-tool" &&
-          (part.state === "input-available" || part.state === "input-streaming")
-        ) {
-          const params =
-            part.input && typeof part.input === "object" && !Array.isArray(part.input)
-              ? (part.input as Record<string, unknown>)
-              : undefined;
-          return { toolName: part.toolName, toolParams: params };
-        }
-      }
-    }
-    return null;
-  }, [messages]);
+  const activeRunningTool = findActiveRunningTool(messages);
 
   const cancelAllPendingElicitations = () => {
     setPendingElicitations((prev) => {

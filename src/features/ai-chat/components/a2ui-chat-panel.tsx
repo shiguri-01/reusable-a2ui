@@ -1,12 +1,19 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  ScrollArea,
+  ScrollAreaContent,
+  ScrollAreaScrollbar,
+  ScrollAreaScrollToEnd,
+  ScrollAreaThumb,
+  ScrollAreaViewport,
+} from "@ui-sdk/react/scroll-area";
 import { AlertCircle, ArrowDown, ArrowUp, Eye, Loader2, Square, X } from "lucide-react";
-import { useStickToBottom } from "use-stick-to-bottom";
 import type { DataModel } from "@/features/a2ui/data-model";
 import type { A2UIAction } from "@/features/a2ui/types";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import type { useCodexChat } from "../hooks/use-codex-chat";
 import type { AiPreviewDraft } from "../types";
 import { ChatMessageItem } from "./chat-message-item";
@@ -76,14 +83,6 @@ export function A2UIChatPanel({
     sendPrompt,
   } = chat;
 
-  const { scrollRef, contentRef, isAtBottom, scrollToBottom } = useStickToBottom();
-
-  useEffect(() => {
-    if (pendingElicitations.length > 0) {
-      void scrollToBottom();
-    }
-  }, [pendingElicitations.length, scrollToBottom]);
-
   const handleSendText = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || isStreaming) return;
@@ -103,9 +102,9 @@ export function A2UIChatPanel({
       <CodexOfflineBanner status={codexStatus} onReconnect={() => void connect()} />
 
       {/* Conversation */}
-      <div className="relative min-h-0 flex-1">
-        <ScrollArea className="h-full" viewportRef={scrollRef}>
-          <div ref={contentRef} className="space-y-5 px-4 py-4">
+      <ScrollArea stickToEnd className="relative min-h-0 flex-1 overflow-hidden">
+        <ScrollAreaViewport role="log" aria-label="チャット履歴" className="h-full w-full">
+          <ScrollAreaContent className="space-y-5 px-4 py-4">
             {messages.length === 0 ? (
               <div className="space-y-2 py-2">
                 <div className="text-muted-foreground text-xs font-medium">プロンプト例</div>
@@ -175,22 +174,26 @@ export function A2UIChatPanel({
                 <AlertDescription className="leading-relaxed">{error.message}</AlertDescription>
               </Alert>
             )}
-          </div>
-        </ScrollArea>
+          </ScrollAreaContent>
+        </ScrollAreaViewport>
 
-        {!isAtBottom && messages.length > 0 && (
-          <Button
-            type="button"
-            variant="secondary"
-            size="icon"
-            className="absolute right-4 bottom-3 size-7 rounded-full shadow-sm"
-            aria-label="最新へスクロール"
-            onClick={() => scrollToBottom()}
-          >
-            <ArrowDown className="size-3.5" />
-          </Button>
-        )}
-      </div>
+        <ScrollAreaScrollbar
+          orientation="vertical"
+          className="flex w-2.5 flex-col p-0.5 opacity-0 transition-opacity data-visible:opacity-100"
+        >
+          <ScrollAreaThumb className="bg-border hover:bg-muted-foreground/40 data-dragging:bg-muted-foreground/60 rounded-full" />
+        </ScrollAreaScrollbar>
+
+        <ScrollAreaScrollToEnd
+          aria-label="最新へスクロール"
+          className={cn(
+            buttonVariants({ variant: "secondary", size: "icon" }),
+            "pointer-events-none absolute right-4 bottom-3 size-7 rounded-full opacity-0 shadow-sm transition-opacity data-visible:pointer-events-auto data-visible:opacity-100",
+          )}
+        >
+          <ArrowDown className="size-3.5" />
+        </ScrollAreaScrollToEnd>
+      </ScrollArea>
 
       {showDashboardReturn && (
         <div className="shrink-0 border-t p-3 md:hidden">

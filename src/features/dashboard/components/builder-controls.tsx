@@ -1,7 +1,12 @@
 import { useId, type ReactNode } from "react";
+import {
+  SegmentedControl,
+  SegmentedControlIndicator,
+  SegmentedControlItem,
+} from "@ui-sdk/react/segmented-control";
 import { useShortcutHint } from "@ui-sdk/react/shortcuts";
 import { Plus, Redo2, Save, Undo2 } from "lucide-react";
-import { getByPath, type DataModel } from "@/features/a2ui/data-model";
+import { getByPath, toPrimitiveString, type DataModel } from "@/features/a2ui/data-model";
 import type { BoundValue } from "@/features/a2ui/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +21,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import type {
   BuilderCanvasMode,
@@ -53,35 +57,34 @@ export function BuilderSegmentedControl<T extends string = string>({
   size = "sm",
 }: BuilderSegmentedControlProps<T>) {
   return (
-    <ToggleGroup
-      type="single"
+    <SegmentedControl
       value={value}
       aria-label={ariaLabel}
       onValueChange={(next) => {
         if (!next) return;
-        const option = options.find(({ value }) => value === next);
+        const option = options.find((opt) => opt.value === next);
         if (option) onChange(option.value);
       }}
       className={cn(
-        "bg-muted inline-grid w-full auto-cols-fr grid-flow-col gap-0.5 rounded-lg p-0.5",
+        "bg-muted relative isolate inline-grid w-full auto-cols-fr grid-flow-col gap-0.5 rounded-lg p-0.5",
         className,
       )}
     >
+      <SegmentedControlIndicator className="bg-background pointer-events-none absolute top-(--segmented-control-indicator-top) left-(--segmented-control-indicator-left) -z-10 h-(--segmented-control-indicator-height) w-(--segmented-control-indicator-width) rounded-md shadow-xs transition-[top,left,width,height] duration-150 motion-reduce:transition-none data-[activation-direction=none]:transition-none" />
       {options.map((opt) => (
-        <ToggleGroupItem
+        <SegmentedControlItem
           key={opt.value}
           value={opt.value}
           title={opt.title}
           className={cn(
-            "text-muted-foreground hover:text-foreground hover:bg-transparent data-[state=on]:bg-background data-[state=on]:text-foreground h-auto min-w-0 rounded-md font-medium shadow-none first:rounded-md last:rounded-md data-[state=on]:shadow-xs",
-            "text-xs",
+            "text-muted-foreground hover:text-foreground data-checked:text-foreground focus-visible:ring-ring/50 inline-flex min-w-0 cursor-pointer items-center justify-center rounded-md text-xs font-medium outline-none transition-colors focus-visible:ring-2",
             size === "xs" ? "px-2 py-1" : "px-2.5 py-1.5",
           )}
         >
           {opt.label}
-        </ToggleGroupItem>
+        </SegmentedControlItem>
       ))}
-    </ToggleGroup>
+    </SegmentedControl>
   );
 }
 
@@ -128,12 +131,16 @@ export function AddBlockButton({
       variant="outline"
       className={cn("justify-start", className)}
       title={`ブロックを追加（${hint.text}）`}
+      aria-keyshortcuts={hint.ariaKeyshortcuts}
       onClick={onClick}
     >
       <Plus className="size-4" />
       <span className={cn(compact && "@max-[26rem]:sr-only")}>ブロックを追加</span>
       {!compact && (
-        <kbd className="bg-muted text-muted-foreground ml-auto rounded-xs px-1.5 py-0.5 font-sans text-[10px] font-medium">
+        <kbd
+          aria-hidden="true"
+          className="bg-muted text-muted-foreground ml-auto rounded-xs px-1.5 py-0.5 font-sans text-[10px] font-medium"
+        >
           {hint.text}
         </kbd>
       )}
@@ -160,6 +167,7 @@ export function UndoRedoButtons({
         disabled={!builder.canUndo}
         title={`元に戻す（${undoHint.text}）`}
         aria-label="元に戻す"
+        aria-keyshortcuts={undoHint.ariaKeyshortcuts}
         onClick={builder.undo}
       >
         <Undo2 className="size-3.5" />
@@ -172,6 +180,7 @@ export function UndoRedoButtons({
         disabled={!builder.canRedo}
         title={`やり直す（${redoHint.text}）`}
         aria-label="やり直す"
+        aria-keyshortcuts={redoHint.ariaKeyshortcuts}
         onClick={builder.redo}
       >
         <Redo2 className="size-3.5" />
@@ -215,16 +224,6 @@ export function BuilderSwitchRow({ label, checked, onCheckedChange }: BuilderSwi
   );
 }
 
-function groupOptions(options: DataBindingOption[]): Map<string, DataBindingOption[]> {
-  const grouped = new Map<string, DataBindingOption[]>();
-  for (const opt of options) {
-    const list = grouped.get(opt.group) ?? [];
-    list.push(opt);
-    grouped.set(opt.group, list);
-  }
-  return grouped;
-}
-
 function BindingPathSelect({
   id,
   value,
@@ -244,22 +243,25 @@ function BindingPathSelect({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {Array.from(groupOptions(options), ([group, fields]) => (
-          <SelectGroup key={group}>
-            <SelectLabel>{group}</SelectLabel>
-            {fields.map(({ path, label }) => {
-              const preview = getByPath(dataModel, path);
-              return (
-                <SelectItem key={path} value={path} className="text-xs">
-                  <span>{label}</span>
-                  {preview !== undefined && (
-                    <span className="text-muted-foreground ml-1">（{String(preview)}）</span>
-                  )}
-                </SelectItem>
-              );
-            })}
-          </SelectGroup>
-        ))}
+        {Array.from(
+          Map.groupBy(options, (opt) => opt.group),
+          ([group, fields]) => (
+            <SelectGroup key={group}>
+              <SelectLabel>{group}</SelectLabel>
+              {fields.map(({ path, label }) => {
+                const previewText = toPrimitiveString(getByPath(dataModel, path));
+                return (
+                  <SelectItem key={path} value={path} className="text-xs">
+                    <span>{label}</span>
+                    {previewText !== "" && (
+                      <span className="text-muted-foreground ml-1">（{previewText}）</span>
+                    )}
+                  </SelectItem>
+                );
+              })}
+            </SelectGroup>
+          ),
+        )}
       </SelectContent>
     </Select>
   );
@@ -311,7 +313,7 @@ export function BoundStringControl({
                 onChange({ "@path": currentPath });
               } else {
                 const resolved = isBoundPath(value)
-                  ? String(getByPath(dataModel, value["@path"]) ?? "")
+                  ? toPrimitiveString(getByPath(dataModel, value["@path"]))
                   : currentLiteral;
                 onChange(allowEmpty && !resolved ? undefined : resolved);
               }

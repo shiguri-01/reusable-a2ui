@@ -13,18 +13,11 @@ interface JsonRpcRequest {
   params?: Record<string, unknown>;
 }
 
-const CORS_HEADERS: Record<string, string> = {
-  "access-control-allow-origin": "*",
-  "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
-  "access-control-allow-headers": "content-type, accept, mcp-session-id, mcp-protocol-version",
-};
-
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
-      ...CORS_HEADERS,
     },
   });
 }
@@ -128,20 +121,16 @@ export async function handleMcpPost(request: Request): Promise<Response> {
     ).filter((item): item is Record<string, unknown> => item !== null);
 
     if (responses.length === 0) {
-      return new Response(null, { status: 202, headers: CORS_HEADERS });
+      return new Response(null, { status: 202 });
     }
     return jsonResponse(responses, 200);
   }
 
   const response = await handleSingleRpcMessage(payload as JsonRpcRequest);
   if (response === null) {
-    return new Response(null, { status: 202, headers: CORS_HEADERS });
+    return new Response(null, { status: 202 });
   }
   return jsonResponse(response, 200);
-}
-
-export function handleMcpOptions(): Response {
-  return new Response(null, { status: 204, headers: CORS_HEADERS });
 }
 
 export function handleMcpGet(): Response {
@@ -158,5 +147,5 @@ export function handleMcpGet(): Response {
 }
 
 export function handleMcpDelete(): Response {
-  return new Response(null, { status: 204, headers: CORS_HEADERS });
+  return new Response(null, { status: 204 });
 }

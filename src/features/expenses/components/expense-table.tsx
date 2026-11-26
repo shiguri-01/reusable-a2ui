@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Toggle, ToggleGroup } from "@ui-sdk/react/toggle";
 import { Search, Trash2 } from "lucide-react";
 import {
   AlertDialog,
@@ -30,6 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { ALL_CATEGORY_LABEL, EXPENSE_CATEGORIES, formatYen, type ExpenseItem } from "../model";
 
 interface ExpenseTableProps {
@@ -68,19 +70,28 @@ export function ExpenseTable({
                 className="pl-9"
               />
             </div>
-            <div className="flex flex-wrap gap-1.5">
+            <ToggleGroup
+              value={[category]}
+              deselectable={false}
+              aria-label="カテゴリで絞り込み"
+              onValueChange={(next) => {
+                if (next[0]) onCategoryChange(next[0]);
+              }}
+              className="flex flex-wrap gap-1.5"
+            >
               {[ALL_CATEGORY_LABEL, ...EXPENSE_CATEGORIES].map((cat) => (
-                <Button
+                <Toggle
                   key={cat}
-                  type="button"
-                  size="sm"
-                  variant={category === cat ? "default" : "outline"}
-                  onClick={() => onCategoryChange(cat)}
+                  value={cat}
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "data-pressed:bg-primary data-pressed:text-primary-foreground data-pressed:border-primary data-pressed:hover:bg-primary/90",
+                  )}
                 >
                   {cat}
-                </Button>
+                </Toggle>
               ))}
-            </div>
+            </ToggleGroup>
           </div>
           <CardTitle className="sr-only">支出テーブル</CardTitle>
           <CardDescription className="sr-only">登録済みの支出ログ一覧</CardDescription>

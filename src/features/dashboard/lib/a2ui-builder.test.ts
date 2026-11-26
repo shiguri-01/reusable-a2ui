@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { PRESET_UI_VERSIONS } from "@/features/a2ui/presets";
 import { DASHBOARD_SURFACE_ID } from "@/features/a2ui/types";
 import { validateA2UISurfaceMessages } from "@/features/a2ui/validate";
+import { commitComponentPatch } from "../components/inspector/inspector-shared";
 import {
   duplicateComponent,
   extractEditableSurface,
@@ -100,4 +101,23 @@ it("recognizes the AI request's base only while the version and draft snapshot s
   expect(matchesProposalBase(base, { messages: editedMessages, versionId: 3 })).toBe(false);
   expect(matchesProposalBase(base, { messages, versionId: 4 })).toBe(false);
   expect(matchesProposalBase(undefined, base)).toBe(false);
+});
+
+it("commits inspector patches against the latest node without clobbering updated children", () => {
+  const onUpdateNode = vi.fn();
+  const latestCard = {
+    id: "form-card",
+    component: "Card" as const,
+    title: "支出を記録",
+    children: ["title-field"],
+  };
+
+  commitComponentPatch(latestCard, { title: "更新後タイトル" }, onUpdateNode);
+
+  expect(onUpdateNode).toHaveBeenCalledExactlyOnceWith("form-card", {
+    id: "form-card",
+    component: "Card",
+    title: "更新後タイトル",
+    children: ["title-field"],
+  });
 });

@@ -1,5 +1,7 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { action } from "@void/react";
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useSyncAssistantExpenses } from "@/features/ai-chat/context/assistant-context";
 import { ALL_CATEGORY_LABEL, formatYen, type ExpenseItem } from "../model";
 import { ExpenseCreateDialog } from "./expense-create-dialog";
@@ -14,29 +16,29 @@ export function ExpensesView({ expenses }: ExpensesViewProps) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState(ALL_CATEGORY_LABEL);
   const [pendingId, setPendingId] = useState<number | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return expenses.filter((item) => {
-      const matchCat = category === ALL_CATEGORY_LABEL || item.category === category;
-      const matchQuery =
-        !q ||
-        item.title.toLowerCase().includes(q) ||
-        item.note.toLowerCase().includes(q) ||
-        item.category.toLowerCase().includes(q);
-      return matchCat && matchQuery;
-    });
-  }, [expenses, query, category]);
+  const normalizedQuery = query.trim().toLowerCase();
+  const filtered = expenses.filter((item) => {
+    const matchCat = category === ALL_CATEGORY_LABEL || item.category === category;
+    const matchQuery =
+      !normalizedQuery ||
+      item.title.toLowerCase().includes(normalizedQuery) ||
+      item.note.toLowerCase().includes(normalizedQuery) ||
+      item.category.toLowerCase().includes(normalizedQuery);
+    return matchCat && matchQuery;
+  });
 
-  const totalAmount = useMemo(
-    () => filtered.reduce((sum, item) => sum + item.amount, 0),
-    [filtered],
-  );
+  const totalAmount = filtered.reduce((sum, item) => sum + item.amount, 0);
 
   const handleDelete = async (id: number) => {
     setPendingId(id);
+    setActionError(null);
     try {
-      await action("/expenses?delete", { data: { id } });
+      const res = await action("/expenses?delete", { data: { id } });
+      if (!res.ok) {
+        setActionError(res.error.message);
+      }
     } finally {
       setPendingId(null);
     }
@@ -56,6 +58,13 @@ export function ExpensesView({ expenses }: ExpensesViewProps) {
           <ExpenseCreateDialog />
         </div>
       </div>
+
+      {actionError && (
+        <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 px-3 py-2">
+          <AlertCircle />
+          <AlertDescription className="text-xs font-medium">{actionError}</AlertDescription>
+        </Alert>
+      )}
 
       <ExpenseTable
         expenses={filtered}

@@ -22,12 +22,28 @@ export function useDashboardShortcuts(
     if (selectedId) builder.deleteNode(selectedId);
   };
 
-  useShortcut("mod+k", () => builder.openPalette(), { when: canUseShortcut });
-  useShortcut("mod+z", builder.undo, { when: () => canUseShortcut() && builder.canUndo });
-  useShortcut("mod+shift+z", builder.redo, { when: () => canUseShortcut() && builder.canRedo });
-  useShortcut("escape", () => builder.setSelectedId(null), {
-    when: () => canUseShortcut() && selectedId !== null,
+  useShortcut(enabled ? "mod+k" : null, () => builder.openPalette(), {
+    when: canUseShortcut,
+    description: "ブロックを追加",
   });
-  useShortcut("backspace", deleteSelection, { when: canDelete });
-  useShortcut("delete", deleteSelection, { when: canDelete });
+  useShortcut(enabled ? "mod+z" : null, builder.undo, {
+    when: () => canUseShortcut() && builder.canUndo,
+    description: "元に戻す",
+  });
+  useShortcut(enabled ? "mod+shift+z" : null, builder.redo, {
+    when: () => canUseShortcut() && builder.canRedo,
+    description: "やり直す",
+  });
+  useShortcut(enabled ? "escape" : null, () => builder.setSelectedId(null), {
+    when: () => canUseShortcut() && selectedId !== null,
+    description: "ブロックの選択を解除",
+  });
+  useShortcut(enabled ? "backspace" : null, deleteSelection, {
+    when: canDelete,
+    description: "選択中のブロックを削除",
+  });
+  useShortcut(enabled ? "delete" : null, deleteSelection, {
+    when: canDelete,
+    description: "選択中のブロックを削除",
+  });
 }

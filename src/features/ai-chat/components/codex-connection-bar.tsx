@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Check, Copy, Plug, PlugZap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,21 +10,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DEFAULT_CODEX_WS_URL, type CodexClientStatus } from "@/features/ai-chat/codex/client";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 
 const SERVER_START_COMMAND = "vp run codex:server";
 
 function CommandCopyRow() {
-  const [copiedCmd, setCopiedCmd] = useState(false);
-
-  const handleCopyCommand = async () => {
-    try {
-      await navigator.clipboard.writeText(SERVER_START_COMMAND);
-      setCopiedCmd(true);
-      setTimeout(() => setCopiedCmd(false), 1800);
-    } catch {
-      // ignore clipboard errors
-    }
-  };
+  const { copied, copy } = useCopyToClipboard(1800);
 
   return (
     <div className="bg-background flex items-center justify-between gap-2 rounded border px-2.5 py-1.5 font-mono text-xs">
@@ -34,12 +24,12 @@ function CommandCopyRow() {
         type="button"
         variant="ghost"
         size="icon"
-        onClick={() => void handleCopyCommand()}
+        onClick={() => void copy(SERVER_START_COMMAND)}
         className="text-muted-foreground hover:text-foreground size-6 shrink-0"
         title="コピー"
         aria-label="起動コマンドをコピー"
       >
-        {copiedCmd ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+        {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
       </Button>
     </div>
   );

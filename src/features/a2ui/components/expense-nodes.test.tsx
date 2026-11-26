@@ -47,3 +47,40 @@ describe("CategoryBreakdown", () => {
     expect(html.indexOf("width:75%")).toBeLessThan(html.indexOf("width:25%"));
   });
 });
+
+describe("ExpenseList", () => {
+  it("renders empty fallback instead of throwing when dataPath resolves to malformed data", () => {
+    const malformedMessages: A2UIMessage[] = [
+      {
+        version: A2UI_PROTOCOL_VERSION,
+        createSurface: {
+          surfaceId: "chat-inline",
+          catalogId: EXPENSE_CATALOG_ID,
+          components: [
+            {
+              id: "root",
+              component: "ExpenseList",
+              dataPath: "/brokenExpenses",
+              emptyText: "明細なし",
+            },
+          ],
+          dataModel: {
+            brokenExpenses: { notAnArray: true },
+          },
+        },
+      },
+    ];
+
+    const html = renderToStaticMarkup(
+      <A2UISurface
+        messages={malformedMessages}
+        dataModel={{}}
+        onDataModelChange={vi.fn()}
+        onAction={vi.fn()}
+        compact
+      />,
+    );
+
+    expect(html).toContain("明細なし");
+  });
+});

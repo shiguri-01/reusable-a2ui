@@ -8,21 +8,25 @@ export type { McpToolAnnotations, McpToolDefinition } from "../types";
 
 export const MCP_TOOLS: McpToolDefinition[] = [...EXPENSE_MCP_TOOLS, ...UI_VERSION_MCP_TOOLS];
 
-export function getMcpToolDescriptors() {
-  return MCP_TOOLS.map((tool) => {
-    const jsonSchema = z.toJSONSchema(tool.inputSchema, {
-      target: "draft-2020-12",
-      unrepresentable: "any",
-    }) as Record<string, unknown>;
-    delete jsonSchema.$schema;
+const MCP_TOOLS_BY_NAME = new Map(MCP_TOOLS.map((tool) => [tool.name, tool]));
 
-    return {
-      name: tool.name,
-      description: tool.description,
-      inputSchema: jsonSchema,
-      annotations: tool.annotations,
-    };
-  });
+const MCP_TOOL_DESCRIPTORS = MCP_TOOLS.map((tool) => {
+  const jsonSchema = z.toJSONSchema(tool.inputSchema, {
+    target: "draft-2020-12",
+    unrepresentable: "any",
+  }) as Record<string, unknown>;
+  delete jsonSchema.$schema;
+
+  return {
+    name: tool.name,
+    description: tool.description,
+    inputSchema: jsonSchema,
+    annotations: tool.annotations,
+  };
+});
+
+export function getMcpToolDescriptors() {
+  return MCP_TOOL_DESCRIPTORS;
 }
 
 export async function callMcpTool(
@@ -33,7 +37,7 @@ export async function callMcpTool(
   content: Array<{ type: "text"; text: string }>;
   structuredContent?: Record<string, unknown>;
 }> {
-  const tool = MCP_TOOLS.find((item) => item.name === name);
+  const tool = MCP_TOOLS_BY_NAME.get(name);
   if (!tool) {
     return {
       isError: true,

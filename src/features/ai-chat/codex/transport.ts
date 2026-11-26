@@ -84,8 +84,8 @@ function extractLastUserText(messages: UIMessage[]): string {
 export class CodexChatTransport implements ChatTransport<UIMessage> {
   private readonly client: CodexAppServerClient;
   private readonly getDeveloperInstructions: () => string;
-  private readonly prepareTurn: CodexChatTransportOptions["prepareTurn"];
-  private readonly onDataMutated?: (toolName: string) => void;
+  private prepareTurn: CodexChatTransportOptions["prepareTurn"];
+  private onDataMutated?: (toolName: string) => void;
   private readonly effort: "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
   constructor(options: CodexChatTransportOptions) {
@@ -94,6 +94,11 @@ export class CodexChatTransport implements ChatTransport<UIMessage> {
     this.prepareTurn = options.prepareTurn;
     this.onDataMutated = options.onDataMutated;
     this.effort = options.effort ?? "low";
+  }
+
+  updateHandlers(handlers: Pick<CodexChatTransportOptions, "prepareTurn" | "onDataMutated">): void {
+    this.prepareTurn = handlers.prepareTurn;
+    this.onDataMutated = handlers.onDataMutated;
   }
 
   async sendMessages(
