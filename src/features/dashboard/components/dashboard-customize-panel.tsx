@@ -1,5 +1,4 @@
-import { useShortcutHint } from "@ui-sdk/react/shortcuts";
-import { Code2, History, Redo2, RotateCcw, Save, SlidersHorizontal, Undo2 } from "lucide-react";
+import { Code2, History, RotateCcw, Save, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SidebarContent, SidebarFooter } from "@/components/ui/sidebar";
@@ -7,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { DashboardSidebarHost } from "@/features/ai-chat/context/assistant-context";
 import type { CustomizePanelTab } from "../hooks/use-dashboard-controller";
 import { JsonEditorPanel } from "./json-editor-panel";
-import { BuilderSegmentedControl } from "./builder-controls";
+import { CanvasModeControl, UndoRedoButtons } from "./builder-controls";
 import { VersionHistoryPanel } from "./version-history-panel";
 import { VisualBuilderPanel } from "./visual-builder-panel";
 
@@ -23,8 +22,6 @@ export function DashboardCustomizePanel({ host }: { host: DashboardSidebarHost }
     onActivateVersion,
   } = host;
 
-  const undoHint = useShortcutHint("mod+z");
-  const redoHint = useShortcutHint("mod+shift+z");
   const isEditingSurface = customizeTab === "builder" || customizeTab === "json";
 
   return (
@@ -50,60 +47,8 @@ export function DashboardCustomizePanel({ host }: { host: DashboardSidebarHost }
         </TabsList>
 
         {isEditingSurface && (
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <BuilderSegmentedControl
-                size="xs"
-                value={builder.canvasMode}
-                ariaLabel="表示モード"
-                options={[
-                  { value: "edit", label: "編集" },
-                  { value: "preview", label: "プレビュー" },
-                  { value: "split", label: "並べて比較" },
-                ]}
-                onChange={builder.setCanvasMode}
-              />
-            </div>
-
-            <div className="flex shrink-0 items-center gap-0.5">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-7"
-                disabled={!builder.canUndo}
-                title={`元に戻す（${undoHint.text}）`}
-                aria-label="元に戻す"
-                onClick={builder.undo}
-              >
-                <Undo2 className="size-3.5" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-7"
-                disabled={!builder.canRedo}
-                title={`やり直す（${redoHint.text}）`}
-                aria-label="やり直す"
-                onClick={builder.redo}
-              >
-                <Redo2 className="size-3.5" />
-              </Button>
-              {builder.isDirty && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-foreground size-7"
-                  title="変更をリセット"
-                  aria-label="変更をリセット"
-                  onClick={builder.resetDraft}
-                >
-                  <RotateCcw className="size-3.5" />
-                </Button>
-              )}
-            </div>
+          <div className="md:hidden">
+            <CanvasModeControl value={builder.canvasMode} onChange={builder.setCanvasMode} />
           </div>
         )}
       </div>
@@ -150,5 +95,31 @@ export function DashboardCustomizePanel({ host }: { host: DashboardSidebarHost }
         </SidebarFooter>
       )}
     </Tabs>
+  );
+}
+
+export function DashboardCustomizeDraftActions({
+  builder,
+  customizeTab,
+}: Pick<DashboardSidebarHost, "builder" | "customizeTab">) {
+  if (customizeTab === "history") return null;
+
+  return (
+    <div className="mr-1 flex items-center gap-0.5 border-r pr-1">
+      <UndoRedoButtons builder={builder} />
+      {builder.isDirty && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground hover:text-foreground size-7"
+          title="変更をリセット"
+          aria-label="変更をリセット"
+          onClick={builder.resetDraft}
+        >
+          <RotateCcw className="size-3.5" />
+        </Button>
+      )}
+    </div>
   );
 }

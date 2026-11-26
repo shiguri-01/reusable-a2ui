@@ -1,6 +1,9 @@
 import { useId, type ReactNode } from "react";
+import { useShortcutHint } from "@ui-sdk/react/shortcuts";
+import { Plus, Redo2, Undo2 } from "lucide-react";
 import { getByPath, type DataModel } from "@/features/a2ui/data-model";
 import type { BoundValue } from "@/features/a2ui/types";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -15,6 +18,11 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
+import type {
+  BuilderCanvasMode,
+  DashboardBuilderActions,
+  DashboardBuilderState,
+} from "../hooks/use-dashboard-controller";
 import {
   NUMBER_BINDING_OPTIONS,
   STRING_BINDING_OPTIONS,
@@ -74,6 +82,92 @@ export function BuilderSegmentedControl<T extends string = string>({
         </ToggleGroupItem>
       ))}
     </ToggleGroup>
+  );
+}
+
+export function CanvasModeControl({
+  value,
+  onChange,
+  className,
+}: {
+  value: BuilderCanvasMode;
+  onChange: (mode: BuilderCanvasMode) => void;
+  className?: string;
+}) {
+  return (
+    <BuilderSegmentedControl
+      size="xs"
+      value={value}
+      ariaLabel="表示モード"
+      options={[
+        { value: "edit", label: "編集" },
+        { value: "preview", label: "プレビュー" },
+        { value: "split", label: "並べて比較" },
+      ]}
+      onChange={onChange}
+      className={className}
+    />
+  );
+}
+
+export function AddBlockButton({
+  onClick,
+  className,
+}: {
+  onClick: () => void;
+  className?: string;
+}) {
+  const hint = useShortcutHint("mod+k");
+
+  return (
+    <Button type="button" size="sm" className={cn("justify-between", className)} onClick={onClick}>
+      <span className="flex items-center gap-1.5">
+        <Plus className="size-4" />
+        ブロックを追加
+      </span>
+      <kbd className="bg-primary-foreground/15 text-primary-foreground rounded-xs px-1.5 py-0.5 font-sans text-[10px] font-medium">
+        {hint.text}
+      </kbd>
+    </Button>
+  );
+}
+
+export function UndoRedoButtons({
+  builder,
+}: {
+  builder: Pick<DashboardBuilderState, "canUndo" | "canRedo"> &
+    Pick<DashboardBuilderActions, "undo" | "redo">;
+}) {
+  const undoHint = useShortcutHint("mod+z");
+  const redoHint = useShortcutHint("mod+shift+z");
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="size-7"
+        disabled={!builder.canUndo}
+        title={`元に戻す（${undoHint.text}）`}
+        aria-label="元に戻す"
+        onClick={builder.undo}
+      >
+        <Undo2 className="size-3.5" />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="size-7"
+        disabled={!builder.canRedo}
+        title={`やり直す（${redoHint.text}）`}
+        aria-label="やり直す"
+        onClick={builder.redo}
+      >
+        <Redo2 className="size-3.5" />
+      </Button>
+    </>
   );
 }
 

@@ -16,6 +16,7 @@ import type {
   DashboardBuilderState,
   DashboardFeedback,
 } from "../hooks/use-dashboard-controller";
+import { AddBlockButton, CanvasModeControl, UndoRedoButtons } from "./builder-controls";
 
 interface DashboardCanvasProps {
   activeVersion: UiVersion | undefined;
@@ -53,6 +54,7 @@ export function DashboardCanvas({
   const isSplitWide =
     (previewDraft && compareMode === "split") ||
     (isBuilderSessionActive && builder.canvasMode === "split");
+  const canvasWidth = isSplitWide ? "max-w-7xl" : "max-w-6xl";
 
   const editorProps: A2UISurfaceEditorProps | undefined =
     isBuilderSessionActive && builder.canvasMode === "edit"
@@ -79,129 +81,147 @@ export function DashboardCanvas({
   );
 
   return (
-    <div
-      className={cn(
-        "mx-auto w-full space-y-4 px-4 py-6 sm:px-6",
-        isSplitWide ? "max-w-7xl" : "max-w-6xl",
-      )}
-    >
+    <div className="w-full space-y-4 py-6">
       {/* Top Page Header */}
-      <div className="flex min-h-8 items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <h1 className="truncate text-xl font-bold tracking-tight">ダッシュボード</h1>
-          {previewDraft && (
-            <Badge variant="default" className="gap-1">
-              <Eye className="size-3" />
-              プレビュー中
-            </Badge>
-          )}
-          {isBuilderSessionActive && (
-            <Badge variant="secondary" className="gap-1">
-              <SlidersHorizontal className="size-3" />
-              カスタマイズ中
-            </Badge>
-          )}
-        </div>
-
-        {!isCustomizeOpen && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="shrink-0 gap-2"
-            onClick={() => onOpenCustomize("builder")}
-          >
-            <Settings2 className="size-3.5" />
-            <span>カスタマイズ</span>
-          </Button>
+      <div
+        className={cn(
+          "mx-auto",
+          canvasWidth,
+          isBuilderSessionActive && [
+            "md:bg-background/95 md:sticky md:top-14 md:z-20 md:py-1 md:backdrop-blur",
+            "md:after:pointer-events-none md:after:absolute md:after:inset-x-0 md:after:top-full md:after:h-5 md:after:bg-linear-to-b md:after:from-background/95 md:after:to-transparent",
+          ],
         )}
-      </div>
+      >
+        <div className="mx-auto flex min-h-8 max-w-6xl flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-2">
+            <h1 className="truncate text-xl font-bold tracking-tight">ダッシュボード</h1>
+            {previewDraft && (
+              <Badge variant="default" className="gap-1">
+                <Eye className="size-3" />
+                プレビュー中
+              </Badge>
+            )}
+          </div>
 
-      {/* Unsaved draft reminder when Customize panel is closed or on History tab */}
-      {!previewDraft && !isBuilderSessionActive && builder.isDirty && (
-        <div className="bg-muted/60 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3.5 py-2 text-xs">
-          <span className="font-medium">未保存のカスタマイズがあります</span>
-          <div className="flex items-center gap-1.5">
+          {isBuilderSessionActive && (
+            <div className="ml-auto hidden max-w-full flex-wrap items-center justify-end gap-2 md:flex">
+              <div className="flex shrink-0 items-center gap-0.5">
+                <UndoRedoButtons builder={builder} />
+              </div>
+              {customizeTab === "builder" && (
+                <AddBlockButton onClick={() => builder.openPalette()} />
+              )}
+              <CanvasModeControl
+                value={builder.canvasMode}
+                onChange={builder.setCanvasMode}
+                className="w-auto max-w-full border shadow-sm"
+              />
+            </div>
+          )}
+
+          {!isCustomizeOpen && (
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="h-7 gap-1 px-2 text-xs"
-              onClick={builder.resetDraft}
-            >
-              <RotateCcw className="size-3.5" />
-              破棄
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              className="h-7 gap-1 px-2.5 text-xs"
+              className="shrink-0 gap-2"
               onClick={() => onOpenCustomize("builder")}
             >
-              <SlidersHorizontal className="size-3.5" />
-              編集を再開
+              <Settings2 className="size-3.5" />
+              <span>カスタマイズ</span>
             </Button>
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
-      {feedback && (
-        <Alert
-          variant={feedback.type === "error" ? "destructive" : "default"}
-          role={feedback.type === "error" ? "alert" : "status"}
-          className={
-            feedback.type === "error"
-              ? "bg-destructive/10 border-destructive/20 px-3 py-2 text-xs font-medium"
-              : "bg-secondary text-secondary-foreground border-transparent px-3 py-2 text-xs font-medium"
-          }
-        >
-          <AlertDescription
+      <div className={cn("mx-auto space-y-4 px-4 sm:px-6", canvasWidth)}>
+        {/* Unsaved draft reminder when Customize panel is closed or on History tab */}
+        {!previewDraft && !isBuilderSessionActive && builder.isDirty && (
+          <div className="bg-muted/60 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3.5 py-2 text-xs">
+            <span className="font-medium">未保存のカスタマイズがあります</span>
+            <div className="flex items-center gap-1.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 px-2 text-xs"
+                onClick={builder.resetDraft}
+              >
+                <RotateCcw className="size-3.5" />
+                破棄
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="h-7 gap-1 px-2.5 text-xs"
+                onClick={() => onOpenCustomize("builder")}
+              >
+                <SlidersHorizontal className="size-3.5" />
+                編集を再開
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {feedback && (
+          <Alert
+            variant={feedback.type === "error" ? "destructive" : "default"}
+            role={feedback.type === "error" ? "alert" : "status"}
             className={
               feedback.type === "error"
-                ? "text-xs font-medium"
-                : "text-secondary-foreground text-xs font-medium"
+                ? "bg-destructive/10 border-destructive/20 px-3 py-2 text-xs font-medium"
+                : "bg-secondary text-secondary-foreground border-transparent px-3 py-2 text-xs font-medium"
             }
           >
-            {feedback.message}
-          </AlertDescription>
-        </Alert>
-      )}
+            <AlertDescription
+              className={
+                feedback.type === "error"
+                  ? "text-xs font-medium"
+                  : "text-secondary-foreground text-xs font-medium"
+              }
+            >
+              {feedback.message}
+            </AlertDescription>
+          </Alert>
+        )}
 
-      {/* Canvas Body */}
-      {previewDraft && compareMode === "split" ? (
-        <CanvasComparison
-          beforeLabel={`現在のUI（${activeVersion?.name ?? "現在"}）`}
-          before={renderSurface(messages)}
-          afterLabel={`新しいUI（${previewDraft.name}）`}
-          after={renderSurface(previewDraft.messages)}
-          previewId={previewDraft.draftId}
-        />
-      ) : previewDraft && compareMode === "preview" ? (
-        <div
-          key={previewDraft.draftId}
-          className="border-primary/35 ring-primary/10 rounded-xl border p-4 ring-2 motion-safe:animate-dashboard-preview-in"
-        >
-          {renderSurface(previewDraft.messages)}
-        </div>
-      ) : isBuilderSessionActive && builder.canvasMode === "split" ? (
-        <CanvasComparison
-          beforeLabel="保存済みのUI"
-          before={renderSurface(messages)}
-          afterLabel="編集中のUI"
-          after={renderSurface(builder.messages)}
-        />
-      ) : isBuilderSessionActive ? (
-        <div
-          className={cn(
-            builder.canvasMode === "edit" &&
-              "border-primary/25 bg-background/50 rounded-2xl border border-dashed p-3 pt-5 sm:p-4 sm:pt-6",
-          )}
-        >
-          {renderSurface(builder.messages, editorProps)}
-        </div>
-      ) : (
-        renderSurface(messages)
-      )}
+        {/* Canvas Body */}
+        {previewDraft && compareMode === "split" ? (
+          <CanvasComparison
+            beforeLabel={`現在のUI（${activeVersion?.name ?? "現在"}）`}
+            before={renderSurface(messages)}
+            afterLabel={`新しいUI（${previewDraft.name}）`}
+            after={renderSurface(previewDraft.messages)}
+            previewId={previewDraft.draftId}
+          />
+        ) : previewDraft && compareMode === "preview" ? (
+          <div
+            key={previewDraft.draftId}
+            className="border-primary/35 ring-primary/10 rounded-xl border p-4 ring-2 motion-safe:animate-dashboard-preview-in"
+          >
+            {renderSurface(previewDraft.messages)}
+          </div>
+        ) : isBuilderSessionActive && builder.canvasMode === "split" ? (
+          <CanvasComparison
+            beforeLabel="保存済みのUI"
+            before={renderSurface(messages)}
+            afterLabel="編集中のUI"
+            after={renderSurface(builder.messages)}
+          />
+        ) : isBuilderSessionActive ? (
+          <div
+            className={cn(
+              builder.canvasMode === "edit" &&
+                "border-primary/25 bg-background/50 isolate rounded-2xl border border-dashed p-3 pt-5 sm:p-4 sm:pt-6",
+            )}
+          >
+            {renderSurface(builder.messages, editorProps)}
+          </div>
+        ) : (
+          renderSurface(messages)
+        )}
+      </div>
     </div>
   );
 }

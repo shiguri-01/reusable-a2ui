@@ -4,7 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sidebar, SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { DashboardCustomizePanel } from "@/features/dashboard/components/dashboard-customize-panel";
+import {
+  DashboardCustomizeDraftActions,
+  DashboardCustomizePanel,
+} from "@/features/dashboard/components/dashboard-customize-panel";
 import { cn } from "@/lib/utils";
 import type { CodexClientStatus } from "../codex/client";
 import { useAssistantSidebar } from "../context/assistant-context";
@@ -145,7 +148,12 @@ export function AssistantSidebar() {
           </div>
 
           <div className="flex shrink-0 items-center gap-0.5">
-            {!customizeHost && (
+            {customizeHost ? (
+              <DashboardCustomizeDraftActions
+                builder={customizeHost.builder}
+                customizeTab={customizeHost.customizeTab}
+              />
+            ) : (
               <>
                 {chat.messages.length > 0 && (
                   <Button

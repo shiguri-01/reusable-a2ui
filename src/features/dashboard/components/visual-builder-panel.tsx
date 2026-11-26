@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { useShortcut, useShortcutHint } from "@ui-sdk/react/shortcuts";
-import { ChevronDown, Plus } from "lucide-react";
+import { useShortcut } from "@ui-sdk/react/shortcuts";
+import { ChevronDown } from "lucide-react";
 import type { DataModel } from "@/features/a2ui/data-model";
-import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type {
   DashboardBuilderActions,
   DashboardBuilderState,
 } from "../hooks/use-dashboard-controller";
+import { AddBlockButton } from "./builder-controls";
 import { ComponentInspector } from "./component-inspector-form";
 import { StructureOutline } from "./structure-outline";
 
@@ -41,7 +41,6 @@ function isEditableTextTarget(): boolean {
 export function VisualBuilderPanel({ builder, dataModel }: VisualBuilderPanelProps) {
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [layersOpen, setLayersOpen] = useState(true);
-  const addHint = useShortcutHint("mod+k");
 
   useShortcut("mod+k", () => {
     builder.openPalette();
@@ -107,23 +106,8 @@ export function VisualBuilderPanel({ builder, dataModel }: VisualBuilderPanelPro
 
   return (
     <div className="divide-y">
-      {/* Add Block Button */}
-      <div className="px-4 py-3">
-        <Button
-          type="button"
-          variant="default"
-          size="sm"
-          className="w-full justify-between gap-2"
-          onClick={() => builder.openPalette()}
-        >
-          <span className="flex items-center gap-1.5">
-            <Plus className="size-4" />
-            ブロックを追加
-          </span>
-          <kbd className="bg-primary-foreground/15 text-primary-foreground rounded-xs px-1.5 py-0.5 font-sans text-[10px] font-medium">
-            {addHint.text}
-          </kbd>
-        </Button>
+      <div className="px-4 py-3 md:hidden">
+        <AddBlockButton className="w-full" onClick={() => builder.openPalette()} />
       </div>
 
       {/* Collapsible Section: Selected Block Settings */}
