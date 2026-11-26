@@ -18,7 +18,7 @@ import {
 
 export type BuilderCanvasMode = "edit" | "preview" | "split";
 
-export interface DraftOrigin {
+interface DraftOrigin {
   label: string;
   proposal?: Pick<AiPreviewDraft, "draftId" | "description">;
 }

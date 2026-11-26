@@ -59,10 +59,16 @@ describe("parseInlineA2UIResponse", () => {
     const malformed = "```a2ui-json\r\n{\r\n```\r\n補足です。";
     const response = parseInlineA2UIResponse(malformed);
     expect(response.displayText).toBe("補足です。");
-    expect(response.inlineUi).toMatchObject({ status: "invalid", rawJson: "{" });
+    expect(response.inlineUi).toEqual({
+      status: "invalid",
+      error: "インライン UI の JSON 構文エラーです",
+    });
     const interrupted = parseInlineA2UIResponse("```a2ui-json\n[{");
     expect(interrupted.displayText).toBe("");
-    expect(interrupted.inlineUi).toMatchObject({ status: "invalid", rawJson: "[{" });
+    expect(interrupted.inlineUi).toEqual({
+      status: "invalid",
+      error: "UI 定義が途中で終了しました",
+    });
   });
 });
 

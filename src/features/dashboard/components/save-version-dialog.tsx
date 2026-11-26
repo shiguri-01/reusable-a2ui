@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useForm } from "@tanstack/react-form";
 import { Check } from "lucide-react";
 import { z } from "zod";
@@ -42,6 +41,46 @@ export function SaveVersionDialog({
   serverError,
   onSubmit,
 }: SaveVersionDialogProps) {
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!pending || nextOpen) onOpenChange(nextOpen);
+      }}
+    >
+      <DialogContent aria-describedby={undefined} className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-base">変更を保存</DialogTitle>
+        </DialogHeader>
+
+        <SaveVersionFormBody
+          defaultName={defaultName}
+          defaultDescription={defaultDescription}
+          pending={pending}
+          serverError={serverError}
+          onClose={() => onOpenChange(false)}
+          onSubmit={onSubmit}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SaveVersionFormBody({
+  defaultName,
+  defaultDescription,
+  pending,
+  serverError,
+  onClose,
+  onSubmit,
+}: {
+  defaultName: string;
+  defaultDescription: string;
+  pending: boolean;
+  serverError: string | null;
+  onClose: () => void;
+  onSubmit: (values: { name: string; description: string }) => Promise<boolean>;
+}) {
   const form = useForm({
     defaultValues: {
       name: defaultName,
@@ -56,106 +95,78 @@ export function SaveVersionDialog({
         description: value.description.trim(),
       });
       if (ok) {
-        onOpenChange(false);
+        onClose();
       }
     },
   });
 
-  useEffect(() => {
-    if (open) {
-      form.reset({
-        name: defaultName,
-        description: defaultDescription,
-      });
-    }
-  }, [open, defaultName, defaultDescription, form]);
-
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (!pending || nextOpen) onOpenChange(nextOpen);
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        void form.handleSubmit();
       }}
+      className="space-y-4"
     >
-      <DialogContent aria-describedby={undefined} className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-base">変更を保存</DialogTitle>
-        </DialogHeader>
+      <form.Field name="name">
+        {(field) => (
+          <Field data-invalid={field.state.meta.errors.length > 0}>
+            <FieldLabel htmlFor="save-version-name" className="text-xs">
+              ビュー名
+            </FieldLabel>
+            <Input
+              id="save-version-name"
+              autoFocus
+              value={field.state.value}
+              onBlur={field.handleBlur}
+              onChange={(e) => field.handleChange(e.target.value)}
+              placeholder="例：予算を重視したレイアウト"
+            />
+            <FieldError errors={field.state.meta.errors} />
+          </Field>
+        )}
+      </form.Field>
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            void form.handleSubmit();
-          }}
-          className="space-y-4"
-        >
-          <form.Field name="name">
-            {(field) => (
-              <Field data-invalid={field.state.meta.errors.length > 0}>
-                <FieldLabel htmlFor="save-version-name" className="text-xs">
-                  ビュー名
-                </FieldLabel>
-                <Input
-                  id="save-version-name"
-                  autoFocus
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  placeholder="例：予算を重視したレイアウト"
-                />
-                <FieldError errors={field.state.meta.errors} />
-              </Field>
-            )}
-          </form.Field>
+      <form.Field name="description">
+        {(field) => (
+          <Field data-invalid={field.state.meta.errors.length > 0}>
+            <FieldLabel htmlFor="save-version-desc" className="text-xs">
+              変更メモ（任意）
+            </FieldLabel>
+            <Textarea
+              id="save-version-desc"
+              rows={2}
+              value={field.state.value}
+              onBlur={field.handleBlur}
+              onChange={(e) => field.handleChange(e.target.value)}
+              placeholder="例：予算トラッカーを上部に移動"
+              className="text-xs"
+            />
+            <FieldError errors={field.state.meta.errors} />
+          </Field>
+        )}
+      </form.Field>
 
-          <form.Field name="description">
-            {(field) => (
-              <Field data-invalid={field.state.meta.errors.length > 0}>
-                <FieldLabel htmlFor="save-version-desc" className="text-xs">
-                  変更メモ（任意）
-                </FieldLabel>
-                <Textarea
-                  id="save-version-desc"
-                  rows={2}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  placeholder="例：予算トラッカーを上部に移動"
-                  className="text-xs"
-                />
-                <FieldError errors={field.state.meta.errors} />
-              </Field>
-            )}
-          </form.Field>
+      {serverError && <p className="text-destructive text-xs font-medium">{serverError}</p>}
 
-          {serverError && <p className="text-destructive text-xs font-medium">{serverError}</p>}
-
-          <DialogFooter>
+      <DialogFooter>
+        <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={onClose}>
+          キャンセル
+        </Button>
+        <form.Subscribe selector={(state) => [state.canSubmit, state.isSubmitting]}>
+          {([canSubmit, isSubmitting]) => (
             <Button
-              type="button"
-              variant="ghost"
+              type="submit"
               size="sm"
-              disabled={pending}
-              onClick={() => onOpenChange(false)}
+              disabled={!canSubmit || pending || Boolean(isSubmitting)}
             >
-              キャンセル
+              <Check className="size-4" />
+              保存
             </Button>
-            <form.Subscribe selector={(state) => [state.canSubmit, state.isSubmitting]}>
-              {([canSubmit, isSubmitting]) => (
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={!canSubmit || pending || Boolean(isSubmitting)}
-                >
-                  <Check className="size-4" />
-                  保存
-                </Button>
-              )}
-            </form.Subscribe>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+          )}
+        </form.Subscribe>
+      </DialogFooter>
+    </form>
   );
 }

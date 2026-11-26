@@ -7,6 +7,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useChat } from "@ai-sdk/react";
+import { createLocalStorage } from "@ui-sdk/core";
 import type { UIMessage } from "ai";
 import { buildA2UIDeveloperInstructions, buildUserTurnPrompt } from "@/features/a2ui/prompt";
 import {
@@ -17,11 +18,10 @@ import {
 import { CodexChatTransport } from "../codex/transport";
 import type { AiPreviewDraft, DashboardEditBase } from "../types";
 
-const STORAGE_KEY_WS_URL = "reusable-a2ui:codex-ws-url:v3";
+const wsUrlStorage = createLocalStorage("reusable-a2ui:codex-ws-url:v3");
 
 function readStoredWsUrl(): string {
-  if (typeof window === "undefined") return DEFAULT_CODEX_WS_URL;
-  return window.localStorage.getItem(STORAGE_KEY_WS_URL)?.trim() || DEFAULT_CODEX_WS_URL;
+  return wsUrlStorage.get()?.trim() || DEFAULT_CODEX_WS_URL;
 }
 
 function findActiveRunningTool(messages: UIMessage[]) {
@@ -191,9 +191,7 @@ export function useCodexChat({
 
   const connect = async (): Promise<boolean> => {
     const nextUrl = wsUrlInput.trim() || DEFAULT_CODEX_WS_URL;
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEY_WS_URL, nextUrl);
-    }
+    wsUrlStorage.set(nextUrl);
     client.setUrl(nextUrl);
     clearError();
     try {

@@ -3,23 +3,21 @@ import { z } from "zod";
 export const A2UI_PROTOCOL_VERSION = "1.0" as const;
 export const A2UI_ROOT_ID = "root" as const;
 
-export const boundStringSchema = z.union([z.string(), z.object({ "@path": z.string() })]);
-export const boundNumberSchema = z.union([z.number(), z.object({ "@path": z.string() })]);
+const boundStringSchema = z.union([z.string(), z.object({ "@path": z.string() })]);
+const boundNumberSchema = z.union([z.number(), z.object({ "@path": z.string() })]);
 
 export type BoundValue<T> = T | { "@path": string };
 
 /**
  * A2UI v1.0 Action definition on components (`common_types.json#/$defs/Action`).
  */
-export const a2uiComponentActionSchema = z.object({
+const a2uiComponentActionSchema = z.object({
   event: z.object({
     name: z.string().min(1),
     userMessage: boundStringSchema.optional(),
     context: z.record(z.string(), z.unknown()).optional(),
   }),
 });
-
-export type A2UIComponentAction = z.infer<typeof a2uiComponentActionSchema>;
 
 /**
  * Outbound renderer-to-agent action event (`renderer_to_agent.json#/properties/action`).
@@ -223,7 +221,7 @@ export type A2UIComponent = z.infer<typeof a2uiComponentSchema>;
 /**
  * A2UI v1.0 Agent-to-Renderer messages (`specification/v1_0/json/agent_to_renderer.json`).
  */
-export const a2uiMessageSchema = z.union([
+const a2uiMessageSchema = z.union([
   z.object({
     version: z.literal(A2UI_PROTOCOL_VERSION),
     createSurface: z

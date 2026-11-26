@@ -67,7 +67,7 @@ export function setByPath(model: DataModel, path: string, value: unknown): DataM
   return clone;
 }
 
-export function deleteByPath(model: DataModel, path: string): DataModel {
+function deleteByPath(model: DataModel, path: string): DataModel {
   const segments = splitPath(path);
   if (segments.length === 0) {
     return {};

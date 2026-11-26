@@ -2,8 +2,8 @@ import { useSyncExternalStore } from "react";
 import { createLocalStorage } from "@ui-sdk/core";
 
 export const DEFAULT_SIDEBAR_WIDTH = 448;
-export const MIN_SIDEBAR_WIDTH = 320;
-export const MAX_SIDEBAR_WIDTH = 720;
+const MIN_SIDEBAR_WIDTH = 320;
+const MAX_SIDEBAR_WIDTH = 720;
 
 const sidebarWidthStorage = createLocalStorage("reusable-a2ui:sidebar-width:v1");
 

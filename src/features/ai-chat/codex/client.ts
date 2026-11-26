@@ -108,7 +108,7 @@ function parsePersistOptions(raw: unknown): McpElicitationPersist[] {
   return result;
 }
 
-export function parseMcpElicitationRequest(
+function parseMcpElicitationRequest(
   requestId: CodexRequestId,
   params: Record<string, unknown>,
 ): McpElicitationRequest {

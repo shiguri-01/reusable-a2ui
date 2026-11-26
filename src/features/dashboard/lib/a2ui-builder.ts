@@ -9,10 +9,7 @@ import {
 } from "@/features/a2ui/types";
 import { validateA2UISurfaceMessages } from "@/features/a2ui/validate";
 
-export type ContainerComponent = Extract<
-  A2UIComponent,
-  { component: "Column" | "Row" | "Grid" | "Card" }
->;
+type ContainerComponent = Extract<A2UIComponent, { component: "Column" | "Row" | "Grid" | "Card" }>;
 
 export interface BlockBlueprint {
   id: string;
@@ -130,7 +127,7 @@ export function extractEditableSurface(messages: A2UIMessage[]): EditableSurface
  * Normalizes components in pre-order tree traversal starting from rootId so that
  * serialized A2UI v1.0 JSON stays clean, deterministic, and easy to read.
  */
-export function commitComponentsToMessages(
+function commitComponentsToMessages(
   baseMessages: A2UIMessage[],
   nextComponents: A2UIComponent[],
   overrideRootId?: string,
@@ -174,7 +171,7 @@ export function commitComponentsToMessages(
   ];
 }
 
-export function isDescendant(
+function isDescendant(
   componentsById: Map<string, A2UIComponent>,
   candidateAncestorId: string,
   targetId: string,

@@ -4,7 +4,7 @@ import { PRESET_UI_VERSIONS } from "@/features/a2ui/presets";
 import { DASHBOARD_SURFACE_ID, type A2UIMessage } from "@/features/a2ui/types";
 import { validateA2UISurfaceMessages } from "@/features/a2ui/validate";
 
-export const DEFAULT_ACTIVE_UI_VERSION = 3;
+const DEFAULT_ACTIVE_UI_VERSION = 3;
 
 async function listDashboardVersions(): Promise<UiVersion[]> {
   return await db

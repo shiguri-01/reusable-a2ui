@@ -1,10 +1,10 @@
 import type { A2UIMessage } from "./types";
 import { validateA2UISurfaceMessages } from "./validate";
 
-export type InlineA2UIBlock =
+type InlineA2UIBlock =
   | { status: "streaming" }
-  | { status: "invalid"; rawJson: string; error: string }
-  | { status: "ready"; rawJson: string; messages: A2UIMessage[] };
+  | { status: "invalid"; error: string }
+  | { status: "ready"; messages: A2UIMessage[] };
 
 interface InlineA2UIResponse {
   displayText: string;
@@ -18,7 +18,6 @@ function parseInlineBlock(rawJson: string): InlineA2UIBlock {
   } catch {
     return {
       status: "invalid",
-      rawJson,
       error: "インライン UI の JSON 構文エラーです",
     };
   }
@@ -27,14 +26,12 @@ function parseInlineBlock(rawJson: string): InlineA2UIBlock {
   if (!validated.ok) {
     return {
       status: "invalid",
-      rawJson,
       error: validated.error,
     };
   }
 
   return {
     status: "ready",
-    rawJson: JSON.stringify(validated.messages, null, 2),
     messages: validated.messages,
   };
 }
@@ -88,7 +85,6 @@ export function parseInlineA2UIResponse(text: string, isStreaming = false): Inli
       ? { status: "streaming" }
       : {
           status: "invalid",
-          rawJson: text.slice(openFence.bodyStart).trim(),
           error: "UI 定義が途中で終了しました",
         };
     return { displayText, inlineUi };
