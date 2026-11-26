@@ -1,4 +1,5 @@
 import type { ChatRequestOptions, ChatTransport, UIMessage, UIMessageChunk } from "ai";
+import { extractDashboardDraft, type DashboardDraft } from "@/a2ui/draft";
 import type { CodexAppServerClient } from "./client";
 
 const MUTATING_TOOL_NAMES = new Set([
@@ -14,6 +15,7 @@ export interface CodexChatTransportOptions {
   getDeveloperInstructions: () => string;
   formatUserPrompt: (userText: string) => string;
   onDataMutated?: (toolName: string) => void;
+  onDashboardProposed?: (proposal: DashboardDraft) => void;
   effort?: "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
 }
 
@@ -82,6 +84,7 @@ export class CodexChatTransport implements ChatTransport<UIMessage> {
   private readonly getDeveloperInstructions: () => string;
   private readonly formatUserPrompt: (userText: string) => string;
   private readonly onDataMutated?: (toolName: string) => void;
+  private readonly onDashboardProposed?: (proposal: DashboardDraft) => void;
   private readonly effort: "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
   constructor(options: CodexChatTransportOptions) {
@@ -89,6 +92,7 @@ export class CodexChatTransport implements ChatTransport<UIMessage> {
     this.getDeveloperInstructions = options.getDeveloperInstructions;
     this.formatUserPrompt = options.formatUserPrompt;
     this.onDataMutated = options.onDataMutated;
+    this.onDashboardProposed = options.onDashboardProposed;
     this.effort = options.effort ?? "low";
   }
 
@@ -235,13 +239,20 @@ export class CodexChatTransport implements ChatTransport<UIMessage> {
                 providerExecuted: true,
               });
             } else {
+              const output = extractMcpToolOutput(item.result);
               safeEnqueue({
                 type: "tool-output-available",
                 toolCallId,
-                output: extractMcpToolOutput(item.result),
+                output,
                 dynamic: true,
                 providerExecuted: true,
               });
+              if (toolName === "propose_dashboard_ui") {
+                const proposal = extractDashboardDraft(toolCallId, output);
+                if (proposal) {
+                  this.onDashboardProposed?.(proposal);
+                }
+              }
               if (MUTATING_TOOL_NAMES.has(toolName)) {
                 this.onDataMutated?.(toolName);
               }
@@ -285,7 +296,6 @@ export class CodexChatTransport implements ChatTransport<UIMessage> {
 
             if (activeTurnId && turn?.id && turn.id !== activeTurnId) return;
 
-            // Fallback: if the server didn't stream deltas for agentMessage, emit final text
             if (startedTextIds.size === 0 && Array.isArray(turn?.items)) {
               for (const item of turn.items) {
                 if (item.type === "agentMessage" && item.text) {

@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { AlertCircle, ArrowDown, ArrowUp, Loader2, Square } from "lucide-react";
 import { useStickToBottom } from "use-stick-to-bottom";
+import type { DataModel } from "@/a2ui/data-model";
 import { buildA2UIDeveloperInstructions, buildUserTurnPrompt } from "@/a2ui/prompt";
-import { parseA2UIResponse } from "@/a2ui/response";
+import type { A2UIAction } from "@/a2ui/types";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,42 +17,35 @@ import { CodexChatTransport } from "@/lib/codex/transport";
 import { ChatMessageItem } from "./chat-message-item";
 import { CodexConnectionBar } from "./codex-connection-bar";
 import { PreviewCompareDock } from "./preview-compare-dock";
-import {
-  createAiPreviewDraft,
-  getMessageText,
-  getPrecedingUserText,
-  type AiPreviewDraft,
-  type CompareMode,
-} from "./types";
+import type { AiPreviewDraft, CompareMode } from "./types";
 
 export type { AiPreviewDraft, CompareMode } from "./types";
 
 const STORAGE_KEY_WS_URL = "reusable-a2ui:codex-ws-url:v3";
 
 const QUICK_PROMPTS = [
+  "今月の予算状況と使いすぎているカテゴリを教えて",
   "今日のランチ980円（食費）とコーヒー450円（カフェ）を記録して",
-  "今の支出をカテゴリ別に分析して、予算残高と節約ポイントを教えて",
-  "予算管理とカテゴリ分析を最上部に大きく見せるレイアウトにして",
+  "予算管理とカテゴリ分析を最上部に大きく見せるダッシュボードにして",
 ];
 
 interface A2UIChatPanelProps {
   activeVersionName: string;
   currentMessagesJson: string;
-  nextVersionNumber: number;
+  dataModel: DataModel;
   saving: boolean;
   previewDraft: AiPreviewDraft | null;
   compareMode: CompareMode;
-  appliedMessageIds: Record<string, boolean>;
+  appliedDraftIds: Record<string, boolean>;
   onDataMutated: (toolName: string) => void;
+  onExpenseAction: (
+    action: A2UIAction,
+    formValues: Record<string, unknown>,
+  ) => Promise<{ ok: boolean; message?: string }>;
   onPreviewA2UI: (draft: AiPreviewDraft) => void;
   onChangeCompareMode: (mode: CompareMode) => void;
   onDiscardPreview: () => void;
-  onApplyA2UI: (options: {
-    messageId: string;
-    name: string;
-    description: string;
-    messagesJson: string;
-  }) => Promise<void>;
+  onApplyA2UI: (draft: AiPreviewDraft) => Promise<void>;
   onOpenInEditor: (messagesJson: string, suggestedName?: string) => void;
 }
 
@@ -63,12 +57,13 @@ function getInitialWsUrl(): string {
 export function A2UIChatPanel({
   activeVersionName,
   currentMessagesJson,
-  nextVersionNumber,
+  dataModel,
   saving,
   previewDraft,
   compareMode,
-  appliedMessageIds,
+  appliedDraftIds,
   onDataMutated,
+  onExpenseAction,
   onPreviewA2UI,
   onChangeCompareMode,
   onDiscardPreview,
@@ -84,6 +79,9 @@ export function A2UIChatPanel({
 
   const onDataMutatedRef = useRef(onDataMutated);
   onDataMutatedRef.current = onDataMutated;
+
+  const onPreviewRef = useRef(onPreviewA2UI);
+  onPreviewRef.current = onPreviewA2UI;
 
   const client = useMemo(() => new CodexAppServerClient(getInitialWsUrl()), []);
   const [codexStatus, setCodexStatus] = useState<CodexClientStatus>(() => client.getStatus());
@@ -111,6 +109,7 @@ export function A2UIChatPanel({
             currentMessagesJson: latestContextRef.current.currentMessagesJson,
           }),
         onDataMutated: (toolName) => onDataMutatedRef.current(toolName),
+        onDashboardProposed: (proposal) => onPreviewRef.current(proposal),
         effort: "low",
       }),
     [client],
@@ -118,22 +117,6 @@ export function A2UIChatPanel({
 
   const { messages, sendMessage, status, stop, setMessages, error, clearError } = useChat({
     transport,
-    onFinish: ({ message, messages, isAbort, isDisconnect, isError, finishReason }) => {
-      if (isAbort || isDisconnect || isError || finishReason === "interrupted") return;
-      const lastIndex = messages.length - 1;
-      if (message.role !== "assistant" || messages[lastIndex]?.id !== message.id) return;
-
-      const { proposal } = parseA2UIResponse(getMessageText(message));
-      if (proposal?.status !== "ready") return;
-      onPreviewA2UI(
-        createAiPreviewDraft(
-          message.id,
-          getPrecedingUserText(messages, lastIndex),
-          nextVersionNumber,
-          proposal,
-        ),
-      );
-    },
   });
 
   const { scrollRef, contentRef, isAtBottom, scrollToBottom } = useStickToBottom();
@@ -217,15 +200,16 @@ export function A2UIChatPanel({
                 <ChatMessageItem
                   key={message.id}
                   message={message}
-                  precedingUserText={getPrecedingUserText(messages, index)}
-                  nextVersionNumber={nextVersionNumber}
+                  dataModel={dataModel}
+                  pending={saving}
                   isStreamingThis={
                     message.role === "assistant" && index === messages.length - 1 && isStreaming
                   }
-                  isActivePreview={previewDraft?.messageId === message.id}
-                  isApplied={Boolean(appliedMessageIds[message.id])}
+                  activePreviewDraftId={previewDraft?.draftId ?? null}
+                  appliedDraftIds={appliedDraftIds}
+                  onExpenseAction={onExpenseAction}
+                  onSendPrompt={(text) => void handleSendText(text)}
                   onPreview={onPreviewA2UI}
-                  onOpenInEditor={onOpenInEditor}
                 />
               ))
             )}
@@ -261,18 +245,14 @@ export function A2UIChatPanel({
       </div>
 
       {previewDraft && (
-        <div className="grid shrink-0 grid-rows-[1fr] motion-safe:animate-preview-controls-in">
-          <div className="min-h-0 overflow-hidden">
-            <PreviewCompareDock
-              compareMode={compareMode}
-              saving={saving}
-              onChangeCompareMode={onChangeCompareMode}
-              onApply={() => void onApplyA2UI(previewDraft)}
-              onOpenInEditor={() => onOpenInEditor(previewDraft.messagesJson, previewDraft.name)}
-              onDiscard={onDiscardPreview}
-            />
-          </div>
-        </div>
+        <PreviewCompareDock
+          compareMode={compareMode}
+          saving={saving}
+          onChangeCompareMode={onChangeCompareMode}
+          onApply={() => void onApplyA2UI(previewDraft)}
+          onOpenInEditor={() => onOpenInEditor(previewDraft.messagesJson, previewDraft.name)}
+          onDiscard={onDiscardPreview}
+        />
       )}
 
       {/* Composer */}

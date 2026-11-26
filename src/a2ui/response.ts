@@ -1,16 +1,17 @@
-import { a2uiMessagesSchema, type A2UIMessage } from "./types";
+import type { A2UIMessage } from "./types";
+import { validateA2UISurfaceMessages } from "./validate";
 
-export type A2UIProposal =
+export type InlineA2UIBlock =
   | { status: "streaming" }
   | { status: "invalid"; rawJson: string; error: string }
   | { status: "ready"; rawJson: string; messages: A2UIMessage[] };
 
-interface A2UIResponse {
+interface InlineA2UIResponse {
   displayText: string;
-  proposal: A2UIProposal | null;
+  inlineUi: InlineA2UIBlock | null;
 }
 
-function parseProposal(rawJson: string): A2UIProposal {
+function parseInlineBlock(rawJson: string): InlineA2UIBlock {
   let parsed: unknown;
   try {
     parsed = JSON.parse(rawJson);
@@ -18,24 +19,23 @@ function parseProposal(rawJson: string): A2UIProposal {
     return {
       status: "invalid",
       rawJson,
-      error: "JSON の構文エラーのため自動適用できません",
+      error: "インライン UI の JSON 構文エラーです",
     };
   }
 
-  const validated = a2uiMessagesSchema.safeParse(parsed);
-  if (!validated.success) {
-    const firstIssue = validated.error.issues[0];
+  const validated = validateA2UISurfaceMessages(parsed);
+  if (!validated.ok) {
     return {
       status: "invalid",
       rawJson,
-      error: `A2UI スキーマ検証エラー（${firstIssue?.path.join(".") || "root"}：${firstIssue?.message ?? "不正な形式"}）`,
+      error: validated.error,
     };
   }
 
   return {
     status: "ready",
-    rawJson: JSON.stringify(validated.data, null, 2),
-    messages: validated.data,
+    rawJson: JSON.stringify(validated.messages, null, 2),
+    messages: validated.messages,
   };
 }
 
@@ -43,14 +43,17 @@ const A2UI_LANGUAGE = "a2ui-json";
 const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})([^\r\n]*)(\r?\n|\r?$)/gm;
 const PARTIAL_FENCE_LINE = /^ {0,3}(?:`{1,2}|~{1,2})\r?$/;
 
-export function parseA2UIResponse(text: string, isStreaming = false): A2UIResponse {
+/**
+ * Extracts an inline ```a2ui-json block from an assistant chat message.
+ * Dashboard edits are handled separately via MCP tools (`propose_dashboard_ui` / `save_ui_version`).
+ */
+export function parseInlineA2UIResponse(text: string, isStreaming = false): InlineA2UIResponse {
   let visibleStart = 0;
   let visibleEnd = text.length;
   let displayText = "";
   let completedJson: string | null = null;
   let openFence: { marker: string; bodyStart: number; isA2UI: boolean } | null = null;
 
-  // Track regular Markdown fences too, so examples containing an A2UI fence stay visible.
   for (const match of text.matchAll(FENCE_LINE)) {
     const [line, marker, info, lineBreak] = match;
     const lineStart = match.index;
@@ -71,7 +74,6 @@ export function parseA2UIResponse(text: string, isStreaming = false): A2UIRespon
 
     if (marker[0] === "`" && info.includes("`")) continue;
     const isA2UI = language === A2UI_LANGUAGE;
-    // A stream chunk may end before the opening fence's language tag is complete.
     if (isStreaming && !lineBreak.includes("\n") && !isA2UI && A2UI_LANGUAGE.startsWith(language)) {
       visibleEnd = lineStart;
       break;
@@ -82,14 +84,14 @@ export function parseA2UIResponse(text: string, isStreaming = false): A2UIRespon
   }
 
   if (openFence?.isA2UI) {
-    const proposal: A2UIProposal = isStreaming
+    const inlineUi: InlineA2UIBlock = isStreaming
       ? { status: "streaming" }
       : {
           status: "invalid",
           rawJson: text.slice(openFence.bodyStart).trim(),
           error: "UI 定義が途中で終了しました",
         };
-    return { displayText, proposal };
+    return { displayText, inlineUi };
   }
 
   if (isStreaming && !openFence) {
@@ -98,10 +100,10 @@ export function parseA2UIResponse(text: string, isStreaming = false): A2UIRespon
   }
 
   displayText += text.slice(visibleStart, visibleEnd);
-  if (completedJson === null) return { displayText, proposal: null };
+  if (completedJson === null) return { displayText, inlineUi: null };
 
   return {
     displayText,
-    proposal: isStreaming ? { status: "streaming" } : parseProposal(completedJson.trim()),
+    inlineUi: isStreaming ? { status: "streaming" } : parseInlineBlock(completedJson.trim()),
   };
 }

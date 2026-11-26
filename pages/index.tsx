@@ -144,10 +144,10 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
   const [versionDesc, setVersionDesc] = useState("");
   const [editorError, setEditorError] = useState<string | null>(null);
 
-  // Live preview & comparison state for AI-generated A2UI
+  // Live preview & comparison state for AI-generated dashboard A2UI
   const [previewDraft, setPreviewDraft] = useState<AiPreviewDraft | null>(null);
   const [compareMode, setCompareMode] = useState<CompareMode>("preview");
-  const [appliedMessageIds, setAppliedMessageIds] = useState<Record<string, boolean>>({});
+  const [appliedDraftIds, setAppliedDraftIds] = useState<Record<string, boolean>>({});
 
   const messages = useMemo(
     () => parseMessages(activeVersion?.messagesJson ?? "[]"),
@@ -174,23 +174,22 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
     }
   };
 
-  const handleAction = async (act: A2UIAction) => {
-    setFeedback(null);
-
+  const executeExpenseAction = async (
+    act: A2UIAction,
+    sourceForm: Record<string, unknown>,
+  ): Promise<{ ok: boolean; message?: string }> => {
     if (act.name === "createExpense") {
-      const title = String(formState.title ?? "").trim();
-      const amount = Number(formState.amount);
-      const category = String(formState.category ?? EXPENSE_CATEGORIES[0]);
-      const spentAt = String(formState.spentAt ?? getTodayIso()) || getTodayIso();
-      const note = String(formState.note ?? "").trim();
+      const title = String(sourceForm.title ?? "").trim();
+      const amount = Number(sourceForm.amount);
+      const category = String(sourceForm.category ?? EXPENSE_CATEGORIES[0]);
+      const spentAt = String(sourceForm.spentAt ?? getTodayIso()) || getTodayIso();
+      const note = String(sourceForm.note ?? "").trim();
 
       if (!title) {
-        setFeedback({ type: "error", message: "内容を入力してください。" });
-        return;
+        return { ok: false, message: "内容を入力してください。" };
       }
       if (!Number.isFinite(amount) || amount <= 0) {
-        setFeedback({ type: "error", message: "金額は1円以上の数値で入力してください。" });
-        return;
+        return { ok: false, message: "金額は1円以上の数値で入力してください。" };
       }
 
       setPending(true);
@@ -205,26 +204,17 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
           },
         });
         if (!res.ok) {
-          setFeedback({ type: "error", message: res.error.message });
-          return;
+          return { ok: false, message: res.error.message };
         }
-        setFormState({
-          title: "",
-          amount: "",
-          category,
-          spentAt,
-          note: "",
-        });
-        setFeedback({ type: "success", message: `「${title}」を記録しました。` });
+        return { ok: true, message: `「${title}」を記録しました。` };
       } finally {
         setPending(false);
       }
-      return;
     }
 
     if (act.name === "deleteExpense") {
       const id = Number(act.payload?.id);
-      if (!Number.isInteger(id) || id <= 0) return;
+      if (!Number.isInteger(id) || id <= 0) return { ok: false };
 
       setPending(true);
       try {
@@ -232,13 +222,30 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
           data: { id },
         });
         if (!res.ok) {
-          setFeedback({ type: "error", message: res.error.message });
-          return;
+          return { ok: false, message: res.error.message };
         }
-        setFeedback({ type: "success", message: "支出ログを削除しました。" });
+        return { ok: true, message: "支出ログを削除しました。" };
       } finally {
         setPending(false);
       }
+    }
+
+    return { ok: false };
+  };
+
+  const handleAction = async (act: A2UIAction) => {
+    setFeedback(null);
+    const result = await executeExpenseAction(act, formState);
+    if (result.ok && act.name === "createExpense") {
+      setFormState((prev) => ({
+        ...prev,
+        title: "",
+        amount: "",
+        note: "",
+      }));
+    }
+    if (result.message) {
+      setFeedback({ type: result.ok ? "success" : "error", message: result.message });
     }
   };
 
@@ -301,28 +308,23 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
     setCompareMode((prev) => (prev === "current" ? "preview" : prev));
   };
 
-  const handleApplyAiVersion = async (options: {
-    messageId: string;
-    name: string;
-    description: string;
-    messagesJson: string;
-  }): Promise<void> => {
+  const handleApplyAiVersion = async (draft: AiPreviewDraft): Promise<void> => {
     setFeedback(null);
     setPending(true);
     try {
       const res = await action("/?saveVersion", {
         data: {
-          name: options.name,
-          description: options.description,
-          messagesJson: options.messagesJson,
+          name: draft.name,
+          description: draft.description,
+          messagesJson: draft.messagesJson,
         },
       });
       if (!res.ok) {
         setFeedback({ type: "error", message: res.error.message });
         return;
       }
-      setEditorJson(options.messagesJson);
-      setAppliedMessageIds((prev) => ({ ...prev, [options.messageId]: true }));
+      setEditorJson(draft.messagesJson);
+      setAppliedDraftIds((prev) => ({ ...prev, [draft.draftId]: true }));
       setPreviewDraft(null);
       setCompareMode("preview");
     } finally {
@@ -510,14 +512,15 @@ export default function DashboardPage({ expenses, uiVersions, activeVersionId }:
                 currentMessagesJson={
                   previewDraft?.messagesJson ?? activeVersion?.messagesJson ?? "[]"
                 }
-                nextVersionNumber={uiVersions.length + 1}
+                dataModel={dataModel}
                 saving={pending}
                 previewDraft={previewDraft}
                 compareMode={compareMode}
-                appliedMessageIds={appliedMessageIds}
+                appliedDraftIds={appliedDraftIds}
                 onDataMutated={() => {
                   void router.refresh();
                 }}
+                onExpenseAction={executeExpenseAction}
                 onPreviewA2UI={handlePreviewAiVersion}
                 onChangeCompareMode={setCompareMode}
                 onDiscardPreview={() => setPreviewDraft(null)}

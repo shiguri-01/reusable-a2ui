@@ -1,4 +1,5 @@
-import { Trash2 } from "lucide-react";
+import { useId } from "react";
+import { AlertCircle, AlertTriangle, CheckCircle2, Info, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,12 +31,19 @@ interface A2UISurfaceProps {
   onDataModelChange: (next: DataModel) => void;
   onAction: (action: A2UIAction) => void;
   pending?: boolean;
+  compact?: boolean;
 }
 
 const GAP_CLASS = {
   sm: "gap-2",
   md: "gap-4",
   lg: "gap-6",
+} as const;
+
+const COMPACT_GAP_CLASS = {
+  sm: "gap-1.5",
+  md: "gap-2.5",
+  lg: "gap-3.5",
 } as const;
 
 const GRID_COLS_CLASS = {
@@ -45,13 +53,22 @@ const GRID_COLS_CLASS = {
   4: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4",
 } as const;
 
+const COMPACT_GRID_COLS_CLASS = {
+  1: "grid-cols-1",
+  2: "grid-cols-2",
+  3: "grid-cols-2",
+  4: "grid-cols-2",
+} as const;
+
 export function A2UISurface({
   messages,
   dataModel,
   onDataModelChange,
   onAction,
   pending = false,
+  compact = false,
 }: A2UISurfaceProps) {
+  const idPrefix = useId();
   const surface = buildSurfaceState(messages);
 
   if (!surface) {
@@ -68,6 +85,9 @@ export function A2UISurface({
     ...surface.initialDataModel,
     ...dataModel,
   };
+
+  const gapMap = compact ? COMPACT_GAP_CLASS : GAP_CLASS;
+  const gridMap = compact ? COMPACT_GRID_COLS_CLASS : GRID_COLS_CLASS;
 
   const updatePath = (path: string, value: unknown) => {
     onDataModelChange(setByPath(mergedModel, path, value));
@@ -94,7 +114,7 @@ export function A2UISurface({
     switch (node.component) {
       case "Column": {
         return (
-          <div key={node.id} className={cn("flex flex-col", GAP_CLASS[node.gap ?? "md"])}>
+          <div key={node.id} className={cn("flex flex-col", gapMap[node.gap ?? "md"])}>
             {node.children.map((childId) => renderNode(childId, depth + 1))}
           </div>
         );
@@ -119,10 +139,10 @@ export function A2UISurface({
             key={node.id}
             className={cn(
               "flex",
-              GAP_CLASS[node.gap ?? "md"],
+              gapMap[node.gap ?? "md"],
               alignClass,
               justifyClass,
-              node.wrap ? "flex-wrap" : "flex-col sm:flex-row",
+              node.wrap ? "flex-wrap" : compact ? "flex-wrap" : "flex-col sm:flex-row",
             )}
           >
             {node.children.map((childId) => renderNode(childId, depth + 1))}
@@ -134,7 +154,7 @@ export function A2UISurface({
         return (
           <div
             key={node.id}
-            className={cn("grid", GRID_COLS_CLASS[node.columns ?? 2], GAP_CLASS[node.gap ?? "md"])}
+            className={cn("grid", gridMap[node.columns ?? 2], gapMap[node.gap ?? "md"])}
           >
             {node.children.map((childId) => renderNode(childId, depth + 1))}
           </div>
@@ -145,14 +165,20 @@ export function A2UISurface({
         const title = resolveValue(mergedModel, node.title);
         const description = resolveValue(mergedModel, node.description);
         return (
-          <Card key={node.id}>
+          <Card key={node.id} className={cn(compact && "gap-3 py-3.5 shadow-none")}>
             {(title || description) && (
-              <CardHeader>
-                {title && <CardTitle className="text-base">{title}</CardTitle>}
-                {description && <CardDescription>{description}</CardDescription>}
+              <CardHeader className={cn(compact && "px-3.5")}>
+                {title && (
+                  <CardTitle className={cn(compact ? "text-sm" : "text-base")}>{title}</CardTitle>
+                )}
+                {description && (
+                  <CardDescription className={cn(compact && "text-xs")}>
+                    {description}
+                  </CardDescription>
+                )}
               </CardHeader>
             )}
-            <CardContent className="flex flex-col gap-4">
+            <CardContent className={cn("flex flex-col", compact ? "gap-3 px-3.5" : "gap-4")}>
               {node.children.map((childId) => renderNode(childId, depth + 1))}
             </CardContent>
           </Card>
@@ -168,31 +194,46 @@ export function A2UISurface({
         switch (node.variant) {
           case "h1":
             return (
-              <h1 key={node.id} className="text-2xl font-bold tracking-tight">
+              <h1
+                key={node.id}
+                className={cn("font-bold tracking-tight", compact ? "text-lg" : "text-2xl")}
+              >
                 {text}
               </h1>
             );
           case "h2":
             return (
-              <h2 key={node.id} className="text-lg font-semibold tracking-tight">
+              <h2
+                key={node.id}
+                className={cn("font-semibold tracking-tight", compact ? "text-base" : "text-lg")}
+              >
                 {text}
               </h2>
             );
           case "h3":
             return (
-              <h3 key={node.id} className="text-base font-semibold">
+              <h3 key={node.id} className={cn("font-semibold", compact ? "text-sm" : "text-base")}>
                 {text}
               </h3>
             );
           case "metric":
             return (
-              <p key={node.id} className="text-3xl font-bold tabular-nums tracking-tight">
+              <p
+                key={node.id}
+                className={cn(
+                  "font-bold tracking-tight tabular-nums",
+                  compact ? "text-xl" : "text-3xl",
+                )}
+              >
                 {text}
               </p>
             );
           case "muted":
             return (
-              <p key={node.id} className="text-muted-foreground text-sm">
+              <p
+                key={node.id}
+                className={cn("text-muted-foreground", compact ? "text-xs" : "text-sm")}
+              >
                 {text}
               </p>
             );
@@ -219,13 +260,25 @@ export function A2UISurface({
         const helper = resolveValue(mergedModel, node.helper);
         const badge = resolveValue(mergedModel, node.badge);
         return (
-          <Card key={node.id} className="gap-2 py-4">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+          <Card key={node.id} className={cn("gap-2", compact ? "py-3 shadow-none" : "py-4")}>
+            <CardHeader
+              className={cn(
+                "flex flex-row items-center justify-between space-y-0 pb-1",
+                compact && "px-3",
+              )}
+            >
               <CardDescription className="text-xs font-medium">{node.label}</CardDescription>
               {badge && <Badge variant="secondary">{badge}</Badge>}
             </CardHeader>
-            <CardContent className="space-y-1">
-              <div className="text-2xl font-bold tabular-nums tracking-tight">{value}</div>
+            <CardContent className={cn("space-y-1", compact && "px-3")}>
+              <div
+                className={cn(
+                  "font-bold tracking-tight tabular-nums",
+                  compact ? "text-lg" : "text-2xl",
+                )}
+              >
+                {value}
+              </div>
               {helper && <p className="text-muted-foreground text-xs">{helper}</p>}
             </CardContent>
           </Card>
@@ -268,7 +321,7 @@ export function A2UISurface({
         }
 
         return (
-          <div key={node.id} className="space-y-3">
+          <div key={node.id} className={cn(compact ? "space-y-2.5" : "space-y-3")}>
             {items.map((item) => (
               <div key={item.category} className="space-y-1.5">
                 <div className="flex items-center justify-between text-sm">
@@ -317,11 +370,12 @@ export function A2UISurface({
 
       case "TextField": {
         const value = String(getByPath(mergedModel, node.bindPath) ?? "");
+        const fieldId = `${idPrefix}-${node.id}`;
         return (
           <div key={node.id} className="flex flex-1 flex-col gap-1.5">
-            <Label htmlFor={`a2ui-${node.id}`}>{node.label}</Label>
+            <Label htmlFor={fieldId}>{node.label}</Label>
             <Input
-              id={`a2ui-${node.id}`}
+              id={fieldId}
               value={value}
               placeholder={node.placeholder}
               required={node.required}
@@ -334,12 +388,13 @@ export function A2UISurface({
       case "NumberField": {
         const raw = getByPath(mergedModel, node.bindPath);
         const value = raw === undefined || raw === null ? "" : String(raw);
+        const fieldId = `${idPrefix}-${node.id}`;
         return (
           <div key={node.id} className="flex flex-1 flex-col gap-1.5">
-            <Label htmlFor={`a2ui-${node.id}`}>{node.label}</Label>
+            <Label htmlFor={fieldId}>{node.label}</Label>
             <div className="relative">
               <Input
-                id={`a2ui-${node.id}`}
+                id={fieldId}
                 type="number"
                 inputMode="numeric"
                 min={node.min ?? 0}
@@ -360,11 +415,12 @@ export function A2UISurface({
 
       case "DateField": {
         const value = String(getByPath(mergedModel, node.bindPath) ?? "");
+        const fieldId = `${idPrefix}-${node.id}`;
         return (
           <div key={node.id} className="flex flex-1 flex-col gap-1.5">
-            <Label htmlFor={`a2ui-${node.id}`}>{node.label}</Label>
+            <Label htmlFor={fieldId}>{node.label}</Label>
             <Input
-              id={`a2ui-${node.id}`}
+              id={fieldId}
               type="date"
               value={value}
               onChange={(e) => updatePath(node.bindPath, e.target.value)}
@@ -375,11 +431,12 @@ export function A2UISurface({
 
       case "SelectField": {
         const value = String(getByPath(mergedModel, node.bindPath) ?? node.options[0] ?? "");
+        const fieldId = `${idPrefix}-${node.id}`;
         return (
           <div key={node.id} className="flex flex-1 flex-col gap-1.5">
-            <Label htmlFor={`a2ui-${node.id}`}>{node.label}</Label>
+            <Label htmlFor={fieldId}>{node.label}</Label>
             <Select value={value} onValueChange={(next) => updatePath(node.bindPath, next)}>
-              <SelectTrigger id={`a2ui-${node.id}`}>
+              <SelectTrigger id={fieldId}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -399,6 +456,7 @@ export function A2UISurface({
           <Button
             key={node.id}
             type="button"
+            size={compact ? "sm" : "default"}
             variant={node.variant ?? "default"}
             disabled={pending}
             className={cn(node.fullWidth && "w-full")}
@@ -424,7 +482,7 @@ export function A2UISurface({
 
         if (visible.length === 0) {
           return (
-            <div key={node.id} className="text-muted-foreground py-8 text-center text-sm">
+            <div key={node.id} className="text-muted-foreground py-6 text-center text-sm">
               {node.emptyText ?? "該当する支出ログがありません"}
             </div>
           );
@@ -435,7 +493,10 @@ export function A2UISurface({
             {visible.map((item) => (
               <div
                 key={item.id}
-                className="flex items-center justify-between gap-3 py-3 text-sm first:pt-0 last:pb-0"
+                className={cn(
+                  "flex items-center justify-between gap-3 text-sm first:pt-0 last:pb-0",
+                  compact ? "py-2" : "py-3",
+                )}
               >
                 <div className="min-w-0 flex-1 space-y-0.5">
                   <div className="flex flex-wrap items-center gap-2">
@@ -472,6 +533,73 @@ export function A2UISurface({
                 </div>
               </div>
             ))}
+          </div>
+        );
+      }
+
+      case "KeyValueList": {
+        return (
+          <dl key={node.id} className="divide-y text-sm">
+            {node.items.map((item, idx) => {
+              const val = resolveValue(mergedModel, item.value) ?? "-";
+              const badge = resolveValue(mergedModel, item.badge);
+              return (
+                <div
+                  key={`${item.label}-${idx}`}
+                  className={cn(
+                    "flex items-center justify-between gap-3 first:pt-0 last:pb-0",
+                    compact ? "py-1.5" : "py-2",
+                  )}
+                >
+                  <dt className="text-muted-foreground shrink-0 text-xs">{item.label}</dt>
+                  <dd className="flex min-w-0 items-center gap-2 text-right font-medium tabular-nums">
+                    <span className="truncate">{val}</span>
+                    {badge && (
+                      <Badge variant="secondary" className="shrink-0">
+                        {badge}
+                      </Badge>
+                    )}
+                  </dd>
+                </div>
+              );
+            })}
+          </dl>
+        );
+      }
+
+      case "Alert": {
+        const title = resolveValue(mergedModel, node.title);
+        const text = resolveValue(mergedModel, node.text) ?? "";
+        const variant = node.variant ?? "info";
+
+        const variantStyle =
+          variant === "destructive"
+            ? "bg-destructive/10 text-destructive"
+            : variant === "warning"
+              ? "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+              : variant === "success"
+                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                : "bg-muted/70 text-foreground";
+
+        const Icon =
+          variant === "destructive"
+            ? AlertCircle
+            : variant === "warning"
+              ? AlertTriangle
+              : variant === "success"
+                ? CheckCircle2
+                : Info;
+
+        return (
+          <div
+            key={node.id}
+            className={cn("flex items-start gap-2.5 rounded-lg px-3 py-2.5 text-xs", variantStyle)}
+          >
+            <Icon className="mt-0.5 size-4 shrink-0" />
+            <div className="min-w-0 space-y-0.5">
+              {title && <div className="font-semibold">{title}</div>}
+              <p className="leading-relaxed">{text}</p>
+            </div>
           </div>
         );
       }

@@ -3,7 +3,8 @@ import { ValidationError } from "void/handler";
 import { db, desc, eq } from "void/db";
 import { expenses, insertExpenseSchema } from "@schema";
 import { z } from "zod";
-import { a2uiMessagesSchema } from "@/a2ui/types";
+import { DASHBOARD_SURFACE_ID } from "@/a2ui/types";
+import { validateA2UISurfaceMessages } from "@/a2ui/validate";
 import {
   activateUiVersionById,
   createAndActivateUiVersion,
@@ -65,18 +66,17 @@ export const actions = {
       throw new ValidationError({ messagesJson: "有効なJSON形式ではありません" });
     }
 
-    const validated = a2uiMessagesSchema.safeParse(parsed);
-    if (!validated.success) {
-      const firstIssue = validated.error.issues[0];
-      throw new ValidationError({
-        messagesJson: `A2UIスキーマエラー：${firstIssue?.path.join(".") || "root"} - ${firstIssue?.message ?? "不正な形式"}`,
-      });
+    const validated = validateA2UISurfaceMessages(parsed, {
+      expectedSurfaceId: DASHBOARD_SURFACE_ID,
+    });
+    if (!validated.ok) {
+      throw new ValidationError({ messagesJson: validated.error });
     }
 
     await createAndActivateUiVersion({
       name: body.name,
       description: body.description,
-      messages: validated.data,
+      messages: validated.messages,
     });
   }),
 };

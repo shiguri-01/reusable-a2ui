@@ -137,6 +137,24 @@ export const a2uiComponentSchema = z.discriminatedUnion("component", [
     emptyText: z.string().optional(),
     limit: z.number().int().positive().optional(),
   }),
+  z.object({
+    id: z.string().min(1),
+    component: z.literal("KeyValueList"),
+    items: z.array(
+      z.object({
+        label: z.string(),
+        value: boundStringSchema,
+        badge: boundStringSchema.optional(),
+      }),
+    ),
+  }),
+  z.object({
+    id: z.string().min(1),
+    component: z.literal("Alert"),
+    title: boundStringSchema.optional(),
+    text: boundStringSchema,
+    variant: z.enum(["info", "success", "warning", "destructive"]).optional(),
+  }),
 ]);
 
 export type A2UIComponent = z.infer<typeof a2uiComponentSchema>;
@@ -178,3 +196,5 @@ export type A2UIMessage = z.infer<typeof a2uiMessageSchema>;
 export const a2uiMessagesSchema = z.array(a2uiMessageSchema).min(1);
 
 export const EXPENSE_CATALOG_ID = "https://reusable-a2ui.local/catalogs/expense-shadcn-v1";
+export const DASHBOARD_SURFACE_ID = "expense-dashboard";
+export const CHAT_INLINE_SURFACE_ID = "chat-inline";

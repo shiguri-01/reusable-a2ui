@@ -1,15 +1,14 @@
 import { asc, db, desc, eq } from "void/db";
 import { uiVersions, type UiVersion } from "@schema";
 import { PRESET_UI_VERSIONS } from "@/a2ui/presets";
-import { a2uiMessagesSchema, type A2UIMessage } from "@/a2ui/types";
-
-export const EXPENSE_SURFACE_ID = "expense-dashboard";
+import { DASHBOARD_SURFACE_ID, type A2UIMessage } from "@/a2ui/types";
+import { validateA2UISurfaceMessages } from "@/a2ui/validate";
 
 export async function ensureDefaultUiVersions(): Promise<UiVersion[]> {
   const existing = await db
     .select()
     .from(uiVersions)
-    .where(eq(uiVersions.surfaceId, EXPENSE_SURFACE_ID))
+    .where(eq(uiVersions.surfaceId, DASHBOARD_SURFACE_ID))
     .orderBy(asc(uiVersions.version));
 
   if (existing.length > 0) {
@@ -36,13 +35,13 @@ export async function ensureDefaultUiVersions(): Promise<UiVersion[]> {
     return await db
       .select()
       .from(uiVersions)
-      .where(eq(uiVersions.surfaceId, EXPENSE_SURFACE_ID))
+      .where(eq(uiVersions.surfaceId, DASHBOARD_SURFACE_ID))
       .orderBy(asc(uiVersions.version));
   }
 
   await db.insert(uiVersions).values(
     PRESET_UI_VERSIONS.map((preset) => ({
-      surfaceId: EXPENSE_SURFACE_ID,
+      surfaceId: DASHBOARD_SURFACE_ID,
       version: preset.version,
       name: preset.name,
       description: preset.description,
@@ -54,7 +53,7 @@ export async function ensureDefaultUiVersions(): Promise<UiVersion[]> {
   return await db
     .select()
     .from(uiVersions)
-    .where(eq(uiVersions.surfaceId, EXPENSE_SURFACE_ID))
+    .where(eq(uiVersions.surfaceId, DASHBOARD_SURFACE_ID))
     .orderBy(asc(uiVersions.version));
 }
 
@@ -66,7 +65,7 @@ export async function activateUiVersionById(id: number): Promise<UiVersion | nul
   await db
     .update(uiVersions)
     .set({ isActive: 0 })
-    .where(eq(uiVersions.surfaceId, EXPENSE_SURFACE_ID));
+    .where(eq(uiVersions.surfaceId, DASHBOARD_SURFACE_ID));
   await db.update(uiVersions).set({ isActive: 1 }).where(eq(uiVersions.id, target.id));
 
   return { ...target, isActive: 1 };
@@ -80,7 +79,7 @@ export async function activateUiVersionByNumber(versionNumber: number): Promise<
   await db
     .update(uiVersions)
     .set({ isActive: 0 })
-    .where(eq(uiVersions.surfaceId, EXPENSE_SURFACE_ID));
+    .where(eq(uiVersions.surfaceId, DASHBOARD_SURFACE_ID));
   await db.update(uiVersions).set({ isActive: 1 }).where(eq(uiVersions.id, target.id));
 
   return { ...target, isActive: 1 };
@@ -91,13 +90,18 @@ export async function createAndActivateUiVersion(input: {
   description?: string;
   messages: A2UIMessage[];
 }): Promise<UiVersion> {
-  const validated = a2uiMessagesSchema.parse(input.messages);
+  const validated = validateA2UISurfaceMessages(input.messages, {
+    expectedSurfaceId: DASHBOARD_SURFACE_ID,
+  });
+  if (!validated.ok) {
+    throw new Error(validated.error);
+  }
   await ensureDefaultUiVersions();
 
   const existing = await db
     .select({ version: uiVersions.version })
     .from(uiVersions)
-    .where(eq(uiVersions.surfaceId, EXPENSE_SURFACE_ID))
+    .where(eq(uiVersions.surfaceId, DASHBOARD_SURFACE_ID))
     .orderBy(desc(uiVersions.version))
     .limit(1);
 
@@ -106,16 +110,16 @@ export async function createAndActivateUiVersion(input: {
   await db
     .update(uiVersions)
     .set({ isActive: 0 })
-    .where(eq(uiVersions.surfaceId, EXPENSE_SURFACE_ID));
+    .where(eq(uiVersions.surfaceId, DASHBOARD_SURFACE_ID));
 
   const [created] = await db
     .insert(uiVersions)
     .values({
-      surfaceId: EXPENSE_SURFACE_ID,
+      surfaceId: DASHBOARD_SURFACE_ID,
       version: nextVersion,
       name: input.name.trim(),
       description: (input.description ?? "").trim(),
-      messagesJson: JSON.stringify(validated, null, 2),
+      messagesJson: JSON.stringify(validated.messages, null, 2),
       isActive: 1,
     })
     .returning();

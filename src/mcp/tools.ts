@@ -1,7 +1,8 @@
 import { asc, db, desc, eq, inArray } from "void/db";
 import { expenses, type Expense } from "@schema";
 import { z } from "zod";
-import { a2uiMessagesSchema } from "@/a2ui/types";
+import { a2uiMessagesSchema, DASHBOARD_SURFACE_ID, type A2UIMessage } from "@/a2ui/types";
+import { validateA2UISurfaceMessages } from "@/a2ui/validate";
 import { EXPENSE_CATEGORIES, getTodayIso, MONTHLY_BUDGET_LIMIT } from "@/lib/expenses";
 import {
   activateUiVersionById,
@@ -514,6 +515,52 @@ const activateUiVersionTool = defineTool({
   },
 });
 
+function assertValidDashboardMessages(messages: A2UIMessage[]): A2UIMessage[] {
+  const result = validateA2UISurfaceMessages(messages, {
+    expectedSurfaceId: DASHBOARD_SURFACE_ID,
+  });
+  if (!result.ok) {
+    throw new Error(result.error);
+  }
+  return result.messages;
+}
+
+const proposeDashboardUiTool = defineTool({
+  name: "propose_dashboard_ui",
+  description:
+    "ダッシュボードの新しいレイアウト案を検証し、画面上のライブプレビュー（Before/After 比較・適用ドック）に反映します。ユーザーがダッシュボードの変更・改善を求めたときに使ってください。",
+  annotations: {
+    title: "ダッシュボード案を作成",
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
+  inputSchema: z.object({
+    name: z
+      .string()
+      .trim()
+      .min(1)
+      .max(80)
+      .describe("提案するバージョン名（例: v4：予算重視レイアウト）"),
+    description: z.string().trim().max(240).optional().default("").describe("変更内容の短い要約"),
+    messages: a2uiMessagesSchema.describe(
+      `surfaceId="${DASHBOARD_SURFACE_ID}" の有効な A2UI v0.9 メッセージ配列`,
+    ),
+  }),
+  execute: async (args) => {
+    const validated = assertValidDashboardMessages(args.messages);
+    return {
+      draft: {
+        name: args.name,
+        description: args.description,
+        messagesJson: JSON.stringify(validated, null, 2),
+        messages: validated,
+      },
+    };
+  },
+});
+
 const saveUiVersionTool = defineTool({
   name: "save_ui_version",
   description:
@@ -531,10 +578,11 @@ const saveUiVersionTool = defineTool({
     messages: a2uiMessagesSchema.describe("有効な A2UI v0.9 メッセージ配列"),
   }),
   execute: async (args) => {
+    const validated = assertValidDashboardMessages(args.messages);
     const created = await createAndActivateUiVersion({
       name: args.name,
       description: args.description,
-      messages: args.messages,
+      messages: validated,
     });
 
     return {
@@ -556,6 +604,7 @@ export const MCP_TOOLS: McpToolDefinition[] = [
   deleteExpensesTool,
   listUiVersionsTool,
   activateUiVersionTool,
+  proposeDashboardUiTool,
   saveUiVersionTool,
 ];
 
