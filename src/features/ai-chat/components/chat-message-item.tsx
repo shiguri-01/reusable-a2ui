@@ -3,11 +3,9 @@ import type { UIMessage } from "ai";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { DataModel } from "@/features/a2ui/data-model";
-import { parseInlineA2UIResponse } from "@/features/a2ui/response";
 import type { A2UIAction } from "@/features/a2ui/types";
 import { cn } from "@/lib/utils";
 import { getMessageReasoning, getMessageText, type AiPreviewDraft } from "../types";
-import { InlineA2UICard } from "./inline-a2ui-card";
 import { MarkdownContent } from "./markdown-content";
 import { ToolCallRow, type DynamicToolPart } from "./tool-call-row";
 
@@ -48,11 +46,8 @@ export function ChatMessageItem({
     ? []
     : message.parts.filter((part): part is DynamicToolPart => part.type === "dynamic-tool");
 
-  const response = isUser ? null : parseInlineA2UIResponse(textContent, isStreamingThis);
-  const displayText = response?.displayText ?? textContent;
-  const hasDisplayText = displayText.trim().length > 0;
-  const inlineUi = response?.inlineUi ?? null;
-  const showWaiting = isStreamingThis && !inlineUi && toolParts.length === 0;
+  const hasText = textContent.trim().length > 0;
+  const showWaiting = isStreamingThis && toolParts.length === 0;
 
   return (
     <div
@@ -89,7 +84,7 @@ export function ChatMessageItem({
         </div>
       )}
 
-      {(hasDisplayText || showWaiting) && (
+      {(hasText || showWaiting) && (
         <div
           className={cn(
             "text-sm leading-relaxed",
@@ -99,38 +94,24 @@ export function ChatMessageItem({
           )}
         >
           {isUser ? (
-            displayText
-          ) : !hasDisplayText ? (
+            textContent
+          ) : !hasText ? (
             <span className="text-muted-foreground inline-flex items-center gap-1.5">
               <Loader2 className="size-4 animate-spin" />
               応答中...
             </span>
           ) : (
-            <MarkdownContent content={displayText} isAnimating={isStreamingThis} />
+            <MarkdownContent
+              content={textContent}
+              isAnimating={isStreamingThis}
+              baseDataModel={dataModel}
+              pending={pending}
+              onExpenseAction={onExpenseAction}
+              onSendPrompt={onSendPrompt}
+            />
           )}
         </div>
       )}
-
-      {inlineUi &&
-        (inlineUi.status === "ready" ? (
-          <InlineA2UICard
-            messages={inlineUi.messages}
-            baseDataModel={dataModel}
-            pending={pending}
-            onExpenseAction={onExpenseAction}
-            onSendPrompt={onSendPrompt}
-          />
-        ) : inlineUi.status === "streaming" ? (
-          <span
-            role="status"
-            className="text-muted-foreground inline-flex min-h-7 items-center gap-1.5 text-xs"
-          >
-            <Loader2 className="size-3.5 motion-safe:animate-spin" />
-            UI を作成中…
-          </span>
-        ) : (
-          <div className="text-destructive text-xs">{inlineUi.error}</div>
-        ))}
     </div>
   );
 }

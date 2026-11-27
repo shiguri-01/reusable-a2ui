@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
 import { buildSurfaceState, getByPath } from "./data-model";
-import { parseInlineA2UIResponse } from "./response";
 import { A2UI_PROTOCOL_VERSION, DASHBOARD_SURFACE_ID, EXPENSE_CATALOG_ID } from "./types";
 import { validateA2UISurfaceMessages } from "./validate";
 
@@ -28,49 +27,6 @@ const streamedSurface = [
     },
   },
 ];
-
-describe("parseInlineA2UIResponse", () => {
-  it.each(["\n", "\r\n"])("keeps the inline UI hidden across streamed boundaries (%j)", (eol) => {
-    const intro = "今月の予算状況です。\n\n";
-    const block = ["```a2ui-json", JSON.stringify(inlineSurface, null, 2), "```"].join(eol);
-    const text = intro + block;
-    for (let length = intro.length; length <= text.length; length++) {
-      const response = parseInlineA2UIResponse(text.slice(0, length), true);
-      expect(response.displayText).toBe(intro);
-      expect(response.inlineUi?.status ?? "streaming").toBe("streaming");
-    }
-    expect(parseInlineA2UIResponse(text, true).inlineUi).toEqual({ status: "streaming" });
-    expect(parseInlineA2UIResponse(text).inlineUi).toMatchObject({
-      status: "ready",
-      messages: inlineSurface,
-    });
-  });
-
-  it("preserves ordinary markdown, including literal A2UI fences inside code examples", () => {
-    const text =
-      '    indented code\n\n```json\n{"value": 3}\n```\n\n````md\n```a2ui-json\n[]\n```\n````';
-    expect(parseInlineA2UIResponse(text)).toEqual({
-      displayText: text,
-      inlineUi: null,
-    });
-  });
-
-  it("keeps text following the inline UI and reports malformed or interrupted definitions", () => {
-    const malformed = "```a2ui-json\r\n{\r\n```\r\n補足です。";
-    const response = parseInlineA2UIResponse(malformed);
-    expect(response.displayText).toBe("補足です。");
-    expect(response.inlineUi).toEqual({
-      status: "invalid",
-      error: "インライン UI の JSON 構文エラーです",
-    });
-    const interrupted = parseInlineA2UIResponse("```a2ui-json\n[{");
-    expect(interrupted.displayText).toBe("");
-    expect(interrupted.inlineUi).toEqual({
-      status: "invalid",
-      error: "UI 定義が途中で終了しました",
-    });
-  });
-});
 
 describe("validateA2UISurfaceMessages (v1.0)", () => {
   it("requires exactly one agent-to-renderer message per envelope", () => {
