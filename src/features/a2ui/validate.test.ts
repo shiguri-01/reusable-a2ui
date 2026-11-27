@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { buildSurfaceState, getByPath } from "./data-model";
+import { PRESET_UI_VERSIONS } from "./presets";
 import { A2UI_PROTOCOL_VERSION, DASHBOARD_SURFACE_ID, EXPENSE_CATALOG_ID } from "./types";
 import { validateA2UISurfaceMessages } from "./validate";
 
@@ -37,6 +38,54 @@ describe("validateA2UISurfaceMessages (v1.0)", () => {
       ]).ok,
     ).toBe(false);
     expect(validateA2UISurfaceMessages([{ ...create, extra: true }]).ok).toBe(false);
+  });
+
+  it.each([
+    ["a component prop", { component: "Text", text: "Text", extra: true }],
+    [
+      "a CategoryBreakdown prop",
+      { component: "CategoryBreakdown", dataPath: "/categories", extra: true },
+    ],
+    ["a string binding prop", { component: "Text", text: { "@path": "/text", extra: true } }],
+    [
+      "a number binding prop",
+      { component: "ProgressBar", label: "Progress", value: { "@path": "/value", extra: true } },
+    ],
+    [
+      "an action prop",
+      { component: "Button", label: "Submit", action: { event: { name: "submit" }, extra: true } },
+    ],
+    [
+      "an action event prop",
+      { component: "Button", label: "Submit", action: { event: { name: "submit", extra: true } } },
+    ],
+    [
+      "a KeyValueList item prop",
+      { component: "KeyValueList", items: [{ label: "Total", value: "42", extra: true }] },
+    ],
+  ] as const)(
+    "rejects unknown fields in %s for both createSurface and updateComponents",
+    (_label, component) => {
+      const components = [{ id: "root", ...component }];
+      const surfaceId = "chat-inline";
+      const create = { version: A2UI_PROTOCOL_VERSION, createSurface: { surfaceId } };
+
+      expect([
+        validateA2UISurfaceMessages([{ ...create, createSurface: { surfaceId, components } }]).ok,
+        validateA2UISurfaceMessages([
+          create,
+          { version: A2UI_PROTOCOL_VERSION, updateComponents: { surfaceId, components } },
+        ]).ok,
+      ]).toEqual([false, false]);
+    },
+  );
+
+  it.each(PRESET_UI_VERSIONS)("accepts saved dashboard preset $version", ({ messages }) => {
+    expect(
+      validateA2UISurfaceMessages(messages, { expectedSurfaceId: DASHBOARD_SURFACE_ID }),
+    ).toMatchObject({
+      ok: true,
+    });
   });
 
   it("rejects creating a surface again before deleting it", () => {

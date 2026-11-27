@@ -3,16 +3,16 @@ import { z } from "zod";
 export const A2UI_PROTOCOL_VERSION = "1.0" as const;
 export const A2UI_ROOT_ID = "root" as const;
 
-const boundStringSchema = z.union([z.string(), z.object({ "@path": z.string() })]);
-const boundNumberSchema = z.union([z.number(), z.object({ "@path": z.string() })]);
+const boundStringSchema = z.union([z.string(), z.strictObject({ "@path": z.string() })]);
+const boundNumberSchema = z.union([z.number(), z.strictObject({ "@path": z.string() })]);
 
 export type BoundValue<T> = T | { "@path": string };
 
 /**
  * A2UI v1.0 Action definition on components (`common_types.json#/$defs/Action`).
  */
-const a2uiComponentActionSchema = z.object({
-  event: z.object({
+const a2uiComponentActionSchema = z.strictObject({
+  event: z.strictObject({
     name: z.string().min(1),
     userMessage: boundStringSchema.optional(),
     context: z.record(z.string(), z.unknown()).optional(),
@@ -37,13 +37,13 @@ const componentCommonFields = {
 };
 
 export const a2uiComponentSchemas = {
-  Column: z.object({
+  Column: z.strictObject({
     ...componentCommonFields,
     component: z.literal("Column"),
     children: z.array(z.string()),
     gap: z.enum(["sm", "md", "lg"]).optional(),
   }),
-  Row: z.object({
+  Row: z.strictObject({
     ...componentCommonFields,
     component: z.literal("Row"),
     children: z.array(z.string()),
@@ -52,37 +52,37 @@ export const a2uiComponentSchemas = {
     justify: z.enum(["start", "between", "end"]).optional(),
     wrap: z.boolean().optional(),
   }),
-  Grid: z.object({
+  Grid: z.strictObject({
     ...componentCommonFields,
     component: z.literal("Grid"),
     children: z.array(z.string()),
     columns: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]).optional(),
     gap: z.enum(["sm", "md", "lg"]).optional(),
   }),
-  Card: z.object({
+  Card: z.strictObject({
     ...componentCommonFields,
     component: z.literal("Card"),
     title: boundStringSchema.optional(),
     description: boundStringSchema.optional(),
     children: z.array(z.string()),
   }),
-  Divider: z.object({
+  Divider: z.strictObject({
     ...componentCommonFields,
     component: z.literal("Divider"),
   }),
-  Text: z.object({
+  Text: z.strictObject({
     ...componentCommonFields,
     component: z.literal("Text"),
     text: boundStringSchema,
     variant: z.enum(["title", "subtitle", "body", "caption", "metric"]).optional(),
   }),
-  Badge: z.object({
+  Badge: z.strictObject({
     ...componentCommonFields,
     component: z.literal("Badge"),
     text: boundStringSchema,
     variant: z.enum(["default", "secondary", "outline", "destructive"]).optional(),
   }),
-  MetricCard: z.object({
+  MetricCard: z.strictObject({
     ...componentCommonFields,
     component: z.literal("MetricCard"),
     label: z.string(),
@@ -90,7 +90,7 @@ export const a2uiComponentSchemas = {
     helper: boundStringSchema.optional(),
     badge: boundStringSchema.optional(),
   }),
-  ProgressBar: z.object({
+  ProgressBar: z.strictObject({
     ...componentCommonFields,
     component: z.literal("ProgressBar"),
     label: z.string(),
@@ -99,7 +99,7 @@ export const a2uiComponentSchemas = {
     detail: boundStringSchema.optional(),
   }),
   CategoryBreakdown: z
-    .object({
+    .strictObject({
       ...componentCommonFields,
       component: z.literal("CategoryBreakdown"),
       dataPath: z.string(),
@@ -112,14 +112,14 @@ export const a2uiComponentSchemas = {
         .describe("集計の年月・日付範囲・「全期間」。指定するとチャット内の各行から明細を開ける。"),
     })
     .describe("カテゴリ別の支出額と構成比を金額順の横棒で比較する。"),
-  FilterChips: z.object({
+  FilterChips: z.strictObject({
     ...componentCommonFields,
     component: z.literal("FilterChips"),
     bindPath: z.string(),
     options: z.array(z.string()),
     allLabel: z.string().optional(),
   }),
-  TextField: z.object({
+  TextField: z.strictObject({
     ...componentCommonFields,
     component: z.literal("TextField"),
     label: z.string(),
@@ -127,7 +127,7 @@ export const a2uiComponentSchemas = {
     placeholder: z.string().optional(),
     required: z.boolean().optional(),
   }),
-  NumberField: z.object({
+  NumberField: z.strictObject({
     ...componentCommonFields,
     component: z.literal("NumberField"),
     label: z.string(),
@@ -136,20 +136,20 @@ export const a2uiComponentSchemas = {
     min: z.number().optional(),
     suffix: z.string().optional(),
   }),
-  DateField: z.object({
+  DateField: z.strictObject({
     ...componentCommonFields,
     component: z.literal("DateField"),
     label: z.string(),
     bindPath: z.string(),
   }),
-  SelectField: z.object({
+  SelectField: z.strictObject({
     ...componentCommonFields,
     component: z.literal("SelectField"),
     label: z.string(),
     bindPath: z.string(),
     options: z.array(z.string()),
   }),
-  Button: z.object({
+  Button: z.strictObject({
     ...componentCommonFields,
     component: z.literal("Button"),
     label: z.string(),
@@ -159,7 +159,7 @@ export const a2uiComponentSchemas = {
     ),
     fullWidth: z.boolean().optional(),
   }),
-  ExpenseList: z.object({
+  ExpenseList: z.strictObject({
     ...componentCommonFields,
     component: z.literal("ExpenseList"),
     dataPath: z.string(),
@@ -174,18 +174,18 @@ export const a2uiComponentSchemas = {
     emptyText: z.string().optional(),
     limit: z.number().int().positive().optional(),
   }),
-  KeyValueList: z.object({
+  KeyValueList: z.strictObject({
     ...componentCommonFields,
     component: z.literal("KeyValueList"),
     items: z.array(
-      z.object({
+      z.strictObject({
         label: z.string(),
         value: boundStringSchema,
         badge: boundStringSchema.optional(),
       }),
     ),
   }),
-  Alert: z.object({
+  Alert: z.strictObject({
     ...componentCommonFields,
     component: z.literal("Alert"),
     title: boundStringSchema.optional(),

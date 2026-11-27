@@ -137,6 +137,7 @@ export function buildSurfaceState(messages: A2UIMessage[]): SurfaceState | null 
 
   for (const message of messages) {
     if ("createSurface" in message) {
+      if (surfaceId) return null;
       surfaceId = message.createSurface.surfaceId;
       catalogId = message.createSurface.catalogId ?? EXPENSE_CATALOG_ID;
       componentsById.clear();
@@ -149,10 +150,12 @@ export function buildSurfaceState(messages: A2UIMessage[]): SurfaceState | null 
         }
       }
     } else if ("updateComponents" in message) {
+      if (!surfaceId || message.updateComponents.surfaceId !== surfaceId) continue;
       for (const comp of message.updateComponents.components) {
         componentsById.set(comp.id, comp);
       }
     } else if ("updateDataModel" in message) {
+      if (!surfaceId || message.updateDataModel.surfaceId !== surfaceId) continue;
       const { path, value } = message.updateDataModel;
       initialDataModel = updateByPath(initialDataModel, path ?? "/", value, value === null);
     } else if ("deleteSurface" in message) {
