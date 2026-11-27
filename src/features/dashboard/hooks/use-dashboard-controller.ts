@@ -330,7 +330,8 @@ export function useDashboardController({
     messages: draft.activeMessages,
     dataModel,
     pending,
-    feedback,
+    feedback:
+      feedback ?? (draft.savedJsonError ? { type: "error", message: draft.savedJsonError } : null),
     customizeTab,
     setCustomizeTab,
     builder,

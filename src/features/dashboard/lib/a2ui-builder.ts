@@ -10,6 +10,10 @@ import {
 import { validateA2UISurfaceMessages } from "@/features/a2ui/validate";
 
 type ContainerComponent = Extract<A2UIComponent, { component: "Column" | "Row" | "Grid" | "Card" }>;
+type SurfaceDefinition = Omit<
+  Extract<A2UIMessage, { createSurface: unknown }>["createSurface"],
+  "components"
+>;
 
 export interface BlockBlueprint {
   id: string;
@@ -22,10 +26,8 @@ export interface BlockBlueprint {
 }
 
 export interface EditableSurfaceGraph {
-  surfaceId: string;
-  catalogId: string;
+  surfaceDefinition: SurfaceDefinition;
   rootId: string;
-  initialDataModel?: Record<string, unknown>;
   components: A2UIComponent[];
   componentsById: Map<string, A2UIComponent>;
   parentById: Map<string, string>;
@@ -62,25 +64,22 @@ export function createEmptyDashboardMessages(): A2UIMessage[] {
 }
 
 export function extractEditableSurface(messages: A2UIMessage[]): EditableSurfaceGraph {
-  let surfaceId = DASHBOARD_SURFACE_ID;
-  let catalogId = EXPENSE_CATALOG_ID;
+  let surfaceDefinition: SurfaceDefinition = {
+    surfaceId: DASHBOARD_SURFACE_ID,
+    catalogId: EXPENSE_CATALOG_ID,
+  };
   const rootId = A2UI_ROOT_ID;
-  let initialDataModel: Record<string, unknown> | undefined;
   const componentsById = new Map<string, A2UIComponent>();
   const extraMessages: A2UIMessage[] = [];
 
   for (const msg of messages) {
     if ("createSurface" in msg) {
-      surfaceId = msg.createSurface.surfaceId;
-      catalogId = msg.createSurface.catalogId ?? EXPENSE_CATALOG_ID;
-      initialDataModel = msg.createSurface.dataModel
-        ? { ...msg.createSurface.dataModel }
-        : undefined;
+      const { components, ...definition } = msg.createSurface;
+      surfaceDefinition = definition;
       componentsById.clear();
-      if (msg.createSurface.components) {
-        for (const comp of msg.createSurface.components) {
-          componentsById.set(comp.id, comp);
-        }
+      extraMessages.length = 0;
+      for (const comp of components ?? []) {
+        componentsById.set(comp.id, comp);
       }
     } else if ("updateComponents" in msg) {
       for (const comp of msg.updateComponents.components) {
@@ -112,10 +111,8 @@ export function extractEditableSurface(messages: A2UIMessage[]): EditableSurface
   }
 
   return {
-    surfaceId,
-    catalogId,
+    surfaceDefinition,
     rootId,
-    ...(initialDataModel ? { initialDataModel } : {}),
     components: Array.from(componentsById.values()),
     componentsById,
     parentById,
@@ -161,10 +158,8 @@ function commitComponentsToMessages(
     {
       version: A2UI_PROTOCOL_VERSION,
       createSurface: {
-        surfaceId: graph.surfaceId,
-        catalogId: graph.catalogId,
+        ...graph.surfaceDefinition,
         components: ordered,
-        ...(graph.initialDataModel ? { dataModel: graph.initialDataModel } : {}),
       },
     },
     ...graph.extraMessages,
@@ -272,6 +267,10 @@ export function insertBlock(
 
   const existingIds = new Set(graph.componentsById.keys());
   const remapped = remapComponentIds(rawNodes, existingIds);
+  const usesExpenseCatalog = graph.surfaceDefinition.catalogId === EXPENSE_CATALOG_ID;
+  const newComponents = usesExpenseCatalog
+    ? remapped
+    : remapped.map((node) => ({ ...node, "@catalogId": EXPENSE_CATALOG_ID }));
   const entryId = remapped[0]!.id;
 
   const requestedParent = placement?.parentId
@@ -296,7 +295,7 @@ export function insertBlock(
   const updatedComponents = graph.components.map((comp) =>
     comp.id === targetParent.id ? { ...targetParent, children: nextChildren } : comp,
   );
-  updatedComponents.push(...remapped);
+  updatedComponents.push(...newComponents);
 
   return {
     messages: commitComponentsToMessages(messages, updatedComponents, graph.rootId),

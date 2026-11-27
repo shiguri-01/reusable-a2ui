@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { a2uiMessagesSchema, type A2UIComponent, type A2UIMessage } from "@/features/a2ui/types";
+import type { A2UIComponent, A2UIMessage } from "@/features/a2ui/types";
 import type { AiPreviewDraft } from "@/features/ai-chat/types";
 import {
   createEmptyDashboardMessages,
@@ -38,13 +38,14 @@ interface DraftHistoryState {
 
 const MAX_HISTORY_STEPS = 40;
 
-function parseMessages(json: string): A2UIMessage[] {
-  try {
-    const parsed = a2uiMessagesSchema.safeParse(JSON.parse(json));
-    return parsed.success ? parsed.data : createEmptyDashboardMessages();
-  } catch {
-    return createEmptyDashboardMessages();
-  }
+function loadSavedDraft(json: string | undefined): DraftSnapshot {
+  if (json === undefined) return { messages: createEmptyDashboardMessages() };
+  const validated = parseAndValidateDashboardJson(json);
+  if (validated.ok) return { messages: validated.messages };
+  return {
+    messages: createEmptyDashboardMessages(),
+    invalidJson: { text: json, error: validated.error },
+  };
 }
 
 export function useDashboardDraft({
@@ -54,14 +55,14 @@ export function useDashboardDraft({
   activeVersionId: number | undefined;
   activeMessagesJson: string | undefined;
 }) {
-  const activeMessages = useMemo(
-    () => parseMessages(activeMessagesJson ?? "[]"),
-    [activeMessagesJson],
-  );
+  const savedDraft = useMemo(() => loadSavedDraft(activeMessagesJson), [activeMessagesJson]);
+  const activeMessages = savedDraft.messages;
   const canonicalActiveJson = useMemo(
     () => JSON.stringify(activeMessages, null, 2),
     [activeMessages],
   );
+  const savedRawJson = savedDraft.invalidJson?.text ?? canonicalActiveJson;
+  const savedJsonError = savedDraft.invalidJson?.error ?? null;
 
   const [canvasMode, setCanvasMode] = useState<BuilderCanvasMode>("edit");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -71,24 +72,24 @@ export function useDashboardDraft({
   const [syncedVersionId, setSyncedVersionId] = useState<number | undefined>(activeVersionId);
   const [history, setHistory] = useState<DraftHistoryState>(() => ({
     past: [],
-    present: { messages: activeMessages },
+    present: savedDraft,
     future: [],
     resetEpoch: 0,
   }));
-  const [rawJson, setRawJson] = useState<string>(() => canonicalActiveJson);
-  const [jsonError, setJsonError] = useState<string | null>(null);
+  const [rawJson, setRawJson] = useState(savedRawJson);
+  const [jsonError, setJsonError] = useState(savedJsonError);
 
   // Sync builder baseline whenever the active version ID changes externally (e.g. version switch or save).
   if (activeVersionId !== syncedVersionId) {
     setSyncedVersionId(activeVersionId);
     setHistory((prev) => ({
       past: [],
-      present: { messages: activeMessages },
+      present: savedDraft,
       future: [],
       resetEpoch: prev.resetEpoch + 1,
     }));
-    setRawJson(canonicalActiveJson);
-    setJsonError(null);
+    setRawJson(savedRawJson);
+    setJsonError(savedJsonError);
     setSelectedId(null);
   }
 
@@ -98,7 +99,10 @@ export function useDashboardDraft({
     [draftMessages],
   );
   const canonicalDraftJson = useMemo(() => JSON.stringify(draftMessages, null, 2), [draftMessages]);
-  const isDirty = canonicalDraftJson !== canonicalActiveJson || jsonError !== null;
+  const isDirty =
+    canonicalDraftJson !== canonicalActiveJson ||
+    jsonError !== savedJsonError ||
+    (jsonError !== null && rawJson !== savedRawJson);
 
   const captureDraft = (snapshot: DraftSnapshot): DraftSnapshot => ({
     ...snapshot,
@@ -160,12 +164,12 @@ export function useDashboardDraft({
   const resetDraft = () => {
     setHistory((prev) => ({
       past: [],
-      present: { messages: activeMessages },
+      present: savedDraft,
       future: [],
       resetEpoch: prev.resetEpoch + 1,
     }));
-    setRawJson(canonicalActiveJson);
-    setJsonError(null);
+    setRawJson(savedRawJson);
+    setJsonError(savedJsonError);
     setSelectedId(null);
   };
 
@@ -258,6 +262,7 @@ export function useDashboardDraft({
 
   return {
     activeMessages,
+    savedJsonError,
     draftMessages,
     draftGraph,
     canonicalDraftJson,

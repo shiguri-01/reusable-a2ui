@@ -16,21 +16,37 @@ export interface SurfaceState {
   initialDataModel: DataModel;
 }
 
-function splitPath(path: string): string[] {
+function splitPath(path: string): string[] | undefined {
+  if (/~(?![01])/.test(path)) return undefined;
+  if (path === "" || path === "/") return [];
   return path
-    .replace(/^\/+/, "")
+    .replace(/^\//, "")
     .split("/")
-    .filter((segment) => segment.length > 0);
+    .map((segment) => segment.replace(/~1/g, "/").replace(/~0/g, "~"));
+}
+
+function getArrayIndex(key: string): number {
+  return /^(0|[1-9]\d*)$/.test(key) ? Number(key) : -1;
+}
+
+function isDataObject(value: unknown): value is DataModel {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export function getByPath(model: DataModel, path: string): unknown {
   const segments = splitPath(path);
+  if (!segments) return undefined;
   let current: unknown = model;
   for (const segment of segments) {
-    if (current == null || typeof current !== "object") {
+    if (Array.isArray(current)) {
+      const index = getArrayIndex(segment);
+      if (index < 0 || index >= current.length) return undefined;
+      current = current[index];
+    } else if (isDataObject(current) && Object.hasOwn(current, segment)) {
+      current = current[segment];
+    } else {
       return undefined;
     }
-    current = (current as Record<string, unknown>)[segment];
   }
   return current;
 }
@@ -43,52 +59,45 @@ export function toPrimitiveString(value: unknown, fallback = ""): string {
   return fallback;
 }
 
-export function setByPath(model: DataModel, path: string, value: unknown): DataModel {
+function updateByPath(model: DataModel, path: string, value: unknown, remove: boolean): DataModel {
   const segments = splitPath(path);
+  if (!segments) return model;
   if (segments.length === 0) {
-    return typeof value === "object" && value !== null ? (value as DataModel) : model;
+    if (remove) return {};
+    return isDataObject(value) ? value : model;
   }
 
-  const clone: DataModel = { ...model };
-  let cursor: Record<string, unknown> = clone;
+  const update = (parent: unknown, depth: number): unknown => {
+    const key = segments[depth]!;
+    const isLeaf = depth === segments.length - 1;
+    if (Array.isArray(parent)) {
+      const index = getArrayIndex(key);
+      if (index < 0 || index > parent.length || (remove && index === parent.length)) {
+        return parent;
+      }
+      const next: unknown[] = [...parent];
+      if (isLeaf && remove) next.splice(index, 1);
+      else next[index] = isLeaf ? value : update(parent[index], depth + 1);
+      return next;
+    }
 
-  for (let i = 0; i < segments.length - 1; i++) {
-    const key = segments[i]!;
-    const existing = cursor[key];
-    const next =
-      existing && typeof existing === "object" && !Array.isArray(existing)
-        ? { ...(existing as Record<string, unknown>) }
-        : {};
-    cursor[key] = next;
-    cursor = next;
-  }
+    const record = isDataObject(parent) ? parent : {};
+    const hasKey = Object.hasOwn(record, key);
+    if (remove && !hasKey) return parent;
+    if (isLeaf && remove) {
+      const next = { ...record };
+      delete next[key];
+      return next;
+    }
+    const child = hasKey ? record[key] : undefined;
+    return { ...record, [key]: isLeaf ? value : update(child, depth + 1) };
+  };
 
-  cursor[segments[segments.length - 1]!] = value;
-  return clone;
+  return update(model, 0) as DataModel;
 }
 
-function deleteByPath(model: DataModel, path: string): DataModel {
-  const segments = splitPath(path);
-  if (segments.length === 0) {
-    return {};
-  }
-
-  const clone: DataModel = { ...model };
-  let cursor: Record<string, unknown> = clone;
-
-  for (let i = 0; i < segments.length - 1; i++) {
-    const key = segments[i]!;
-    const existing = cursor[key];
-    if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
-      return clone;
-    }
-    const next = { ...(existing as Record<string, unknown>) };
-    cursor[key] = next;
-    cursor = next;
-  }
-
-  delete cursor[segments[segments.length - 1]!];
-  return clone;
+export function setByPath(model: DataModel, path: string, value: unknown): DataModel {
+  return updateByPath(model, path, value, false);
 }
 
 export function resolveValue<T>(model: DataModel, bound: BoundValue<T> | undefined): T | undefined {
@@ -145,22 +154,12 @@ export function buildSurfaceState(messages: A2UIMessage[]): SurfaceState | null 
       }
     } else if ("updateDataModel" in message) {
       const { path, value } = message.updateDataModel;
-      if (path && path !== "/") {
-        initialDataModel =
-          value === null
-            ? deleteByPath(initialDataModel, path)
-            : setByPath(initialDataModel, path, value);
-      } else if (value === null) {
-        initialDataModel = {};
-      } else if (typeof value === "object") {
-        initialDataModel = {
-          ...initialDataModel,
-          ...(value as DataModel),
-        };
-      }
+      initialDataModel = updateByPath(initialDataModel, path ?? "/", value, value === null);
     } else if ("deleteSurface" in message) {
       if (message.deleteSurface.surfaceId === surfaceId) {
-        return null;
+        surfaceId = "";
+        componentsById.clear();
+        initialDataModel = {};
       }
     }
   }

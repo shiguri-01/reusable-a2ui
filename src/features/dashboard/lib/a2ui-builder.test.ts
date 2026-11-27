@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vite-plus/test";
+import { buildSurfaceState } from "@/features/a2ui/data-model";
 import { PRESET_UI_VERSIONS } from "@/features/a2ui/presets";
-import { DASHBOARD_SURFACE_ID } from "@/features/a2ui/types";
+import { DASHBOARD_SURFACE_ID, type A2UIMessage } from "@/features/a2ui/types";
 import { validateA2UISurfaceMessages } from "@/features/a2ui/validate";
 import { commitComponentPatch } from "../components/inspector/inspector-shared";
 import {
@@ -79,6 +80,23 @@ describe("a2ui-builder operations", () => {
     const graph = extractEditableSurface(updated);
     const grid = graph.componentsById.get("kpi-grid");
     expect(grid?.component === "Grid" ? grid.columns : null).toBe(2);
+  });
+
+  it("does not restore the deleted dashboard's data when editing a recreated surface", () => {
+    const messages: A2UIMessage[] = [
+      ...baseV3,
+      {
+        version: "1.0",
+        updateDataModel: { surfaceId: DASHBOARD_SURFACE_ID, path: "/oldValue", value: true },
+      },
+      { version: "1.0", deleteSurface: { surfaceId: DASHBOARD_SURFACE_ID } },
+      ...baseV3,
+    ];
+
+    const edited = moveComponentRelative(messages, "budget-card", "up");
+    expect(buildSurfaceState(edited)?.initialDataModel).toEqual(
+      buildSurfaceState(baseV3)?.initialDataModel,
+    );
   });
 });
 

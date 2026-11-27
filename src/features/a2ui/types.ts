@@ -222,7 +222,7 @@ export type A2UIComponent = z.infer<typeof a2uiComponentSchema>;
  * A2UI v1.0 Agent-to-Renderer messages (`specification/v1_0/json/agent_to_renderer.json`).
  */
 const a2uiMessageSchema = z.union([
-  z.object({
+  z.strictObject({
     version: z.literal(A2UI_PROTOCOL_VERSION),
     createSurface: z
       .object({
@@ -231,10 +231,17 @@ const a2uiMessageSchema = z.union([
         sendDataModel: z.boolean().optional(),
         components: z.array(a2uiComponentSchema).min(1).optional(),
         dataModel: z.record(z.string(), z.unknown()).optional(),
+        metadata: z
+          .strictObject({
+            extensions: z
+              .record(z.string().regex(/^[\p{XID_Start}_]\p{XID_Continue}*$/u), z.unknown())
+              .optional(),
+          })
+          .optional(),
       })
       .strict(),
   }),
-  z.object({
+  z.strictObject({
     version: z.literal(A2UI_PROTOCOL_VERSION),
     updateComponents: z
       .object({
@@ -243,7 +250,7 @@ const a2uiMessageSchema = z.union([
       })
       .strict(),
   }),
-  z.object({
+  z.strictObject({
     version: z.literal(A2UI_PROTOCOL_VERSION),
     updateDataModel: z
       .object({
@@ -257,7 +264,7 @@ const a2uiMessageSchema = z.union([
         path: ["value"],
       }),
   }),
-  z.object({
+  z.strictObject({
     version: z.literal(A2UI_PROTOCOL_VERSION),
     deleteSurface: z
       .object({

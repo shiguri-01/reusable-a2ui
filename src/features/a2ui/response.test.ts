@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { buildSurfaceState } from "./data-model";
+import { buildSurfaceState, getByPath } from "./data-model";
 import { parseInlineA2UIResponse } from "./response";
 import { A2UI_PROTOCOL_VERSION, DASHBOARD_SURFACE_ID, EXPENSE_CATALOG_ID } from "./types";
 import { validateA2UISurfaceMessages } from "./validate";
@@ -73,6 +73,69 @@ describe("parseInlineA2UIResponse", () => {
 });
 
 describe("validateA2UISurfaceMessages (v1.0)", () => {
+  it("requires exactly one agent-to-renderer message per envelope", () => {
+    const create = inlineSurface[0]!;
+    expect(
+      validateA2UISurfaceMessages([
+        { ...create, updateDataModel: { surfaceId: "chat-inline", value: {} } },
+      ]).ok,
+    ).toBe(false);
+    expect(validateA2UISurfaceMessages([{ ...create, extra: true }]).ok).toBe(false);
+  });
+
+  it("rejects creating a surface again before deleting it", () => {
+    expect(validateA2UISurfaceMessages([...inlineSurface, ...inlineSurface]).ok).toBe(false);
+  });
+
+  it.each([undefined, "/"])("replaces the root data model at %j", (path) => {
+    const validated = validateA2UISurfaceMessages([
+      ...inlineSurface,
+      { version: "1.0", updateDataModel: { surfaceId: "chat-inline", path: "/old", value: true } },
+      {
+        version: "1.0",
+        updateDataModel: {
+          surfaceId: "chat-inline",
+          path,
+          value: { user: { firstName: "Alice" } },
+        },
+      },
+    ]);
+
+    if (!validated.ok) throw new Error(validated.error);
+    expect(buildSurfaceState(validated.messages)?.initialDataModel).toEqual({
+      user: { firstName: "Alice" },
+    });
+  });
+
+  it("updates and resolves escaped JSON Pointer keys inside arrays", () => {
+    const validated = validateA2UISurfaceMessages([
+      ...inlineSurface,
+      {
+        version: "1.0",
+        updateDataModel: {
+          surfaceId: "chat-inline",
+          path: "/users",
+          value: [{ "a/b": { "~": "before", "": true } }, { name: "Bob" }],
+        },
+      },
+      {
+        version: "1.0",
+        updateDataModel: { surfaceId: "chat-inline", path: "/users/0/a~1b/~0", value: "Alice" },
+      },
+      {
+        version: "1.0",
+        updateDataModel: { surfaceId: "chat-inline", path: "/users/0/a~1b/", value: null },
+      },
+    ]);
+
+    if (!validated.ok) throw new Error(validated.error);
+    const state = buildSurfaceState(validated.messages);
+    expect(state?.initialDataModel).toEqual({
+      users: [{ "a/b": { "~": "Alice" } }, { name: "Bob" }],
+    });
+    expect(getByPath(state!.initialDataModel, "/users/0/a~1b/~0")).toBe("Alice");
+  });
+
   it("validates single-message and streamed surfaces, root existence, unique IDs, and children references", () => {
     expect(validateA2UISurfaceMessages(inlineSurface).ok).toBe(true);
     expect(validateA2UISurfaceMessages(streamedSurface).ok).toBe(true);
@@ -169,8 +232,12 @@ describe("validateA2UISurfaceMessages (v1.0)", () => {
         version: "1.0",
         deleteSurface: { surfaceId: "chat-inline" },
       },
-      ...inlineSurface,
+      ...streamedSurface,
     ]);
     expect(recreated.ok).toBe(true);
+    if (!recreated.ok) throw new Error(recreated.error);
+    expect(buildSurfaceState(recreated.messages)?.componentsById.get("root")).toEqual(
+      streamedSurface[1]!.updateComponents!.components[0],
+    );
   });
 });

@@ -1,4 +1,10 @@
-import { A2UI_ROOT_ID, a2uiMessagesSchema, type A2UIComponent, type A2UIMessage } from "./types";
+import {
+  A2UI_ROOT_ID,
+  EXPENSE_CATALOG_ID,
+  a2uiMessagesSchema,
+  type A2UIComponent,
+  type A2UIMessage,
+} from "./types";
 
 export type A2UIValidationResult =
   | { ok: true; messages: A2UIMessage[]; surfaceId: string }
@@ -50,6 +56,7 @@ export function validateA2UISurfaceMessages(
   }
 
   let surfaceId = "";
+  let catalogId = EXPENSE_CATALOG_ID;
   const ids = new Set<string>();
   const duplicateIds = new Set<string>();
   const childrenById = new Map<string, readonly string[]>();
@@ -62,6 +69,10 @@ export function validateA2UISurfaceMessages(
 
   const collectComponents = (components: A2UIComponent[], allowReplace: boolean) => {
     for (const comp of components) {
+      const componentCatalog = comp["@catalogId"] ?? catalogId;
+      if (componentCatalog !== EXPENSE_CATALOG_ID) {
+        return `コンポーネント「${comp.id}」のカタログ「${componentCatalog}」には対応していません`;
+      }
       if (!allowReplace && ids.has(comp.id)) {
         duplicateIds.add(comp.id);
       }
@@ -76,10 +87,19 @@ export function validateA2UISurfaceMessages(
 
   for (const msg of parsed.data) {
     if ("createSurface" in msg) {
+      if (surfaceId) {
+        return {
+          ok: false,
+          error: `createSurface の前に Surface「${surfaceId}」を削除してください`,
+        };
+      }
       surfaceId = msg.createSurface.surfaceId;
+      // Older saved dashboards can omit the app's catalog ID.
+      catalogId = msg.createSurface.catalogId ?? EXPENSE_CATALOG_ID;
       resetSurface();
       if (msg.createSurface.components) {
-        collectComponents(msg.createSurface.components, false);
+        const error = collectComponents(msg.createSurface.components, false);
+        if (error) return { ok: false, error };
       }
     } else if ("updateComponents" in msg) {
       if (!surfaceId) {
@@ -98,7 +118,8 @@ export function validateA2UISurfaceMessages(
         }
         batchIds.add(comp.id);
       }
-      collectComponents(msg.updateComponents.components, true);
+      const error = collectComponents(msg.updateComponents.components, true);
+      if (error) return { ok: false, error };
     } else if ("updateDataModel" in msg) {
       if (!surfaceId) {
         return { ok: false, error: "updateDataModel の前に createSurface が必要です" };

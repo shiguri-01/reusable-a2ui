@@ -1,4 +1,4 @@
-import type { A2UIMessage } from "./types";
+import { CHAT_INLINE_SURFACE_ID, type A2UIMessage } from "./types";
 import { validateA2UISurfaceMessages } from "./validate";
 
 type InlineA2UIBlock =
@@ -22,7 +22,9 @@ function parseInlineBlock(rawJson: string): InlineA2UIBlock {
     };
   }
 
-  const validated = validateA2UISurfaceMessages(parsed);
+  const validated = validateA2UISurfaceMessages(parsed, {
+    expectedSurfaceId: CHAT_INLINE_SURFACE_ID,
+  });
   if (!validated.ok) {
     return {
       status: "invalid",
